@@ -7,6 +7,7 @@
 #include <BLEDevice.h>
 #include <BLEUtils.h>
 #include <BLEServer.h>
+#include <BLE2902.h>
 
 // See the following for generating UUIDs:
 // https://www.uuidgenerator.net/
@@ -20,21 +21,45 @@ BLEService *pService;
 BLECharacteristic *pCharacteristic;
 char buffer[30];
 
+class MyCallbacks: public BLECharacteristicCallbacks {
+    void onWrite(BLECharacteristic *pCharacteristic) {
+//      std::string value = pCharacteristic->getValue();
+
+//      if (value.length() > 0) {
+//        Serial.println("*********");
+//        Serial.print("New value: ");
+//        for (int i = 0; i < value.length(); i++)
+//          Serial.print(value[i]);
+//
+//        Serial.println();
+//        Serial.println("*********");
+//      }
+    int value = atoi(pCharacteristic->getValue().c_str());
+    Serial.print("new value: ");
+    Serial.println(value);
+//    pCharacteristic->setValue("OK");
+    pCharacteristic->notify();
+    }
+
+};
+
 void setup() {
   Serial.begin(115200);
   Serial.println("Starting BLE work!");
 
-  
   myBLE->init("ctzESP32");
   pServer = myBLE->createServer();
   pService = pServer->createService(SERVICE_UUID);
   pCharacteristic = pService->createCharacteristic(
-                                         CHARACTERISTIC_UUID,
-                                         BLECharacteristic::PROPERTY_READ |
-                                         BLECharacteristic::PROPERTY_WRITE
+                                      CHARACTERISTIC_UUID,
+                                      BLECharacteristic::PROPERTY_READ   |
+                                      BLECharacteristic::PROPERTY_WRITE  |
+                                      BLECharacteristic::PROPERTY_NOTIFY |
+                                      BLECharacteristic::PROPERTY_INDICATE
                                        );
-
-  pCharacteristic->setValue("Hello World says Neil");
+  pCharacteristic->addDescriptor(new BLE2902());
+  pCharacteristic->setCallbacks(new MyCallbacks());
+  pCharacteristic->setValue("Hello World says Neil, please say hello to me");
   pService->start();
   // BLEAdvertising *pAdvertising = pServer->getAdvertising();  // this still is working for backward compatibility
   BLEAdvertising *pAdvertising = BLEDevice::getAdvertising();

@@ -130,10 +130,7 @@ void discharge(){
     adcbuff[i] = adc1_get_raw(ADC1_CHANNEL_0);
   }
   delay(500);
-  for (int i = 0; i < DISCHARGE_LOOP_CNT; i++)
-  {
-    pRemoteCharacteristic->writeValue(adcbuff[i]);
-  }
+  pRemoteCharacteristic->writeValue(adcbuff,sizeof(adcbuff));
 }
 
 void upGrade(){}

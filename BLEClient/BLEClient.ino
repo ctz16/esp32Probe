@@ -16,9 +16,12 @@ static BLEUUID    charUUID("04b2bcfc-1b74-4203-8b10-6d8e09b5be2b");
 static boolean doConnect = false;
 static boolean connected = false;
 static boolean doScan = false;
+static bool notifyFlag = false;
 static BLERemoteCharacteristic* pRemoteCharacteristic;
 static BLEAdvertisedDevice* myDevice;
 
+uint16_t testbuf[400];
+static uint16_t cnt = 0;
 static void notifyCallback(
   BLERemoteCharacteristic* pBLERemoteCharacteristic,
   uint8_t* pData,
@@ -26,10 +29,11 @@ static void notifyCallback(
   bool isNotify) {
     Serial.print("Notify callback for characteristic ");
     Serial.print(pBLERemoteCharacteristic->getUUID().toString().c_str());
-    Serial.print(" of data length ");
-    Serial.println(length);
+//    Serial.print(" of data length ");
+//    Serial.println(length);
     Serial.print("data: ");
     Serial.println((char*)pData);
+    notifyFlag = true;
 }
 
 class MyClientCallback : public BLEClientCallbacks {
@@ -83,8 +87,11 @@ bool connectToServer() {
       Serial.println(value.c_str());
     }
 
-    if(pRemoteCharacteristic->canNotify())
+    if(pRemoteCharacteristic->canNotify()){
       pRemoteCharacteristic->registerForNotify(notifyCallback);
+      Serial.println("notify registrited!");
+    }
+      
 
     connected = true;
     return true;
@@ -139,6 +146,11 @@ void loop() {
   if (doConnect == true) {
     if (connectToServer()) {
       Serial.println("We are now connected to the BLE Server.");
+      Serial.println("setting new characteristic value");
+      String value = "cnt ready " + String(cnt);
+      pRemoteCharacteristic->writeValue(value.c_str(),value.length());
+      Serial.println(value);
+      cnt++;
     } else {
       Serial.println("We have failed to connect to the server; there is nothin more we will do.");
     }
@@ -148,14 +160,27 @@ void loop() {
   // If we are connected to a peer BLE Server, update the characteristic each time we are reached
   // with the current time since boot.
   if (connected) {
-    String newValue = "Time since boot: " + String(millis()/1000);
-    Serial.println("Setting new characteristic value to \"" + newValue + "\"");
-    
-    // Set the characteristic's value to be the array of bytes that is actually a string.
-    pRemoteCharacteristic->writeValue(newValue.c_str(), newValue.length());
+//    String newValue = "new value:";
+//    for( int i =0; i<100; i++){
+//      newValue += String(i);
+//      newValue += " ";
+//    }
+//    Serial.println("Setting new characteristic value to \"" + newValue + "\"");
+//    
+//    // Set the characteristic's value to be the array of bytes that is actually a string.
+//    pRemoteCharacteristic->writeValue(newValue.c_str(), newValue.length());
+    if (notifyFlag){
+      notifyFlag = false;
+      String s = String(cnt);
+      pRemoteCharacteristic->writeValue(s.c_str(),s.length());
+      Serial.print("cvalue changed to");
+      Serial.println(cnt);
+      cnt++;
+    }
   }else if(doScan){
     BLEDevice::getScan()->start(0);  // this is just eample to start scan after disconnect, most likely there is better way to do it in arduino
+    Serial.println("scanning");
   }
   
-  delay(1000); // Delay a second between loops.
+  delay(5000); // Delay a second between loops.
 } // End of loop
