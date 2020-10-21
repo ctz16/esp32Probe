@@ -34,9 +34,10 @@ class MyCallbacks: public BLECharacteristicCallbacks {
 //        Serial.println();
 //        Serial.println("*********");
 //      }
-    int value = atoi(pCharacteristic->getValue().c_str());
-    Serial.print("new value: ");
-    Serial.println(value);
+    // int value = atoi(pCharacteristic->getValue().c_str());
+    // Serial.print("new value: ");
+    // Serial.println(value);
+    Serial.println(pCharacteristic->getValue().c_str());
 //    pCharacteristic->setValue("OK");
     pCharacteristic->notify();
     }

@@ -66,7 +66,7 @@ const char* serverIndex =
         "<input type='submit' value='Update'>"
     "</form>"
  "<div id='prg'>progress: 0%</div>"
- "<div id='dif'>a new text</div>"
+ "<div id='dif'>new text</div>"
  "<script>"
   "$('form').submit(function(e){"
   "e.preventDefault();"
@@ -97,16 +97,11 @@ const char* serverIndex =
  "});"
  "</script>";
 
-/*
- * setup function
- */
-void setup(void) {
-  Serial.begin(115200);
-
-  // Connect to WiFi network
+void ServerInit(){
+    // Connect to WiFi network
   WiFi.begin(ssid, password);
   Serial.println("");
-
+  
   // Wait for connection
   while (WiFi.status() != WL_CONNECTED) {
     delay(500);
@@ -117,7 +112,7 @@ void setup(void) {
   Serial.println(ssid);
   Serial.print("IP address: ");
   Serial.println(WiFi.localIP());
-
+  
   /*use mdns for host name resolution*/
   if (!MDNS.begin(host)) { //http://esp32.local
     Serial.println("Error setting up MDNS responder!");
@@ -161,6 +156,12 @@ void setup(void) {
     }
   });
   server.begin();
+}
+
+
+void setup(void) {
+  Serial.begin(115200);
+  ServerInit();
 }
 
 void loop(void) {
