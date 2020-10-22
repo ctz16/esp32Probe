@@ -186,7 +186,7 @@ const char* serverIndex =
         "<input type='submit' value='Update'>"
     "</form>"
  "<div id='prg'>progress: 0%</div>"
- "<div id='dif'>new text</div>"
+ "<div id='dif'>new text!!</div>"
  "<script>"
   "$('form').submit(function(e){"
   "e.preventDefault();"
@@ -317,7 +317,7 @@ void setup(void) {
 void loop(void) {
   // if(millis()-stime < worktime){
     server.handleClient();
-  //   delay(1);
+    delay(1);
   // }
   // else{esp_deep_sleep_start();}
 }
