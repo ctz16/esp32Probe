@@ -12,6 +12,7 @@
 #define uS_TO_S_FACTOR 1000000ULL  /* Conversion factor for micro seconds to seconds */
 #define TIME_TO_SLEEP  30        /* Time ESP32 will go to sleep (in seconds) */
 #define DISCHARGE_LOOP_CNT 100
+#define WORKING_TIME 180000
 
 const char* host = "esp32";
 const char* ssid = "SUNIST-6";
@@ -38,6 +39,7 @@ uint16_t cnt = 0;
 long time_to_start = 0;
 long adc_start_time = 0;
 long adc_end_time = 0;
+long start_time = 0;
 // uint16_t tbuff[SPI_FLASH_SEC_SIZE / 4];
 
 static void notifyCallback(
@@ -93,6 +95,7 @@ bool connectToServer() {
     connected = true;
     return true;
 }
+
 /**
  * Scan for BLE servers and find the first one that advertises the service we are looking for.
  */
@@ -147,33 +150,6 @@ void upGrade(){
   isUpGrade = false;
 }
 
-// void setup(){
-//   //Deep sleep mode settings, every sleep is TIME_TO_SLEEP seconds
-//   esp_sleep_enable_timer_wakeup(TIME_TO_SLEEP * uS_TO_S_FACTOR);
-//   esp_deep_sleep_pd_config(ESP_PD_DOMAIN_RTC_PERIPH, ESP_PD_OPTION_OFF);
-//   // rtc_gpio_isolate(GPIO_NUM_12); //wrover module only
-
-//   // Retrieve a Scanner and set the callback we want to use to be informed when we
-//   // have detected a new device.  Specify that we want active scanning and start the
-//   // scan to run for 5 seconds.
-//   BLEDevice::init("");
-//   BLEScan* pBLEScan = BLEDevice::getScan();
-//   pBLEScan->setAdvertisedDeviceCallbacks(new MyAdvertisedDeviceCallbacks());
-//   pBLEScan->setInterval(5);
-//   pBLEScan->setWindow(10);
-//   pBLEScan->setActiveScan(true);
-//   pBLEScan->start(1, false);
-//   if(doConnect){
-//     if(connectToServer()){
-//       pRemoteCharacteristic->writeValue("probe ready");
-//       delay(3);
-//       if(notifyFlag){
-//         time_to_start = atoi(pRemoteCharacteristic->readValue().c_str());
-//       }
-//     }
-//   }
-// }
-
 
 /*
  * Server Index Page
@@ -220,30 +196,21 @@ const char* serverIndex =
 void ServerInit(){
     // Connect to WiFi network
   WiFi.begin(ssid, password);
-  Serial.println("");
   
   // Wait for connection
   while (WiFi.status() != WL_CONNECTED) {
     delay(500);
-    Serial.print(".");
   }
-  Serial.println("");
-  Serial.print("Connected to ");
-  Serial.println(ssid);
-  Serial.print("IP address: ");
-  Serial.println(WiFi.localIP());
   if(notifyFlag){
     notifyFlag = false;
     pRemoteCharacteristic->writeValue(WiFi.localIP().toString().c_str());
   }
   /*use mdns for host name resolution*/
   if (!MDNS.begin(host)) { //http://esp32.local
-    Serial.println("Error setting up MDNS responder!");
     while (1) {
       delay(1000);
     }
   }
-  Serial.println("mDNS responder started");
   /*return index page which is stored in serverIndex */
   server.on("/", HTTP_GET, []() {
     server.sendHeader("Connection", "close");
@@ -261,20 +228,15 @@ void ServerInit(){
   }, []() {
     HTTPUpload& upload = server.upload();
     if (upload.status == UPLOAD_FILE_START) {
-      Serial.printf("Update: %s\n", upload.filename.c_str());
       if (!Update.begin(UPDATE_SIZE_UNKNOWN)) { //start with max available size
-        // Update.printError(Serial);
       }
     } else if (upload.status == UPLOAD_FILE_WRITE) {
       /* flashing firmware to ESP*/
       if (Update.write(upload.buf, upload.currentSize) != upload.currentSize) {
-        // Update.printError(Serial);
       }
     } else if (upload.status == UPLOAD_FILE_END) {
       if (Update.end(true)) { //true to set the size to the current progress
-        Serial.printf("Update Success: %u\nRebooting...\n", upload.totalSize);
       } else {
-        // Update.printError(Serial);
       }
     }
   });
@@ -293,31 +255,31 @@ void BLEinit(){
   pBLEScan->setWindow(449);
   pBLEScan->setActiveScan(true);
   pBLEScan->start(5, false);
-  Serial.println("BLE try connect");
   if(doConnect){
     if(connectToServer()){
       pRemoteCharacteristic->writeValue("probe ready");
     }
     else{
-      Serial.println("BLE connection failed");
     }
   }
 }
 
 void setup(void) {
-  Serial.begin(115200);
-  Serial.println("start working!");
   BLEinit();
   ServerInit();
-  // esp_sleep_enable_timer_wakeup(TIME_TO_SLEEP * uS_TO_S_FACTOR);
-  // esp_deep_sleep_pd_config(ESP_PD_DOMAIN_RTC_PERIPH, ESP_PD_OPTION_OFF);
-  // stime = millis();
+  esp_sleep_enable_timer_wakeup(TIME_TO_SLEEP * uS_TO_S_FACTOR);
+  esp_deep_sleep_pd_config(ESP_PD_DOMAIN_RTC_PERIPH, ESP_PD_OPTION_OFF);
+  start_time = millis();
 }
 
 void loop(void) {
-  // if(millis()-stime < worktime){
+  if(millis()-start_time < WORKING_TIME){
     server.handleClient();
     delay(1);
-  // }
-  // else{esp_deep_sleep_start();}
+  }
+  else{
+    pRemoteCharacteristic->writeValue("sleep");
+    delay(1000);
+    esp_deep_sleep_start();
+  }
 }
