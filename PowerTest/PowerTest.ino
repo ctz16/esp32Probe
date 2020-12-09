@@ -10,8 +10,8 @@
 #include <BLEDevice.h>
 
 #define uS_TO_S_FACTOR 1000000ULL  /* Conversion factor for micro seconds to seconds */
-#define TIME_TO_SLEEP  30        /* Time ESP32 will go to sleep (in seconds) */
-#define DISCHARGE_LOOP_CNT 100
+#define TIME_TO_SLEEP  300        /* Time ESP32 will go to sleep (in seconds) */
+#define DISCHARGE_LOOP_CNT 10000
 #define WORKING_TIME 180000
 
 const char* host = "esp32";
@@ -162,7 +162,7 @@ const char* serverIndex =
         "<input type='submit' value='Update'>"
     "</form>"
  "<div id='prg'>progress: 0%</div>"
- "<div id='dif'>new text!!</div>"
+ "<div id='dif'>new text!!!</div>"
  "<script>"
   "$('form').submit(function(e){"
   "e.preventDefault();"
@@ -204,6 +204,7 @@ void ServerInit(){
   if(notifyFlag){
     notifyFlag = false;
     pRemoteCharacteristic->writeValue(WiFi.localIP().toString().c_str());
+    Serial.println(WiFi.localIP().toString().c_str());
   }
   /*use mdns for host name resolution*/
   if (!MDNS.begin(host)) { //http://esp32.local
@@ -265,10 +266,13 @@ void BLEinit(){
 }
 
 void setup(void) {
-  BLEinit();
-  ServerInit();
+  Serial.begin(115200);
   esp_sleep_enable_timer_wakeup(TIME_TO_SLEEP * uS_TO_S_FACTOR);
   esp_deep_sleep_pd_config(ESP_PD_DOMAIN_RTC_PERIPH, ESP_PD_OPTION_OFF);
+  BLEinit();
+  Serial.println("BLE ready");
+  ServerInit();
+  Serial.println("probe ready");
   start_time = millis();
 }
 
