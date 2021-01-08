@@ -45,7 +45,7 @@ long adc_end_time = 0;
 long start_time = 0;
 // uint16_t tbuff[SPI_FLASH_SEC_SIZE / 4];
 
-/********** Server **********/
+/********** Web Server **********/
 
 /**
  * Scan for BLE servers and find the first one that advertises the service we are looking for.
@@ -212,13 +212,13 @@ bool connectToServer() {
       #ifdef SERIAL_DEBUG
         Serial.println(value);
       #endif
-      if(value[0] == '0'){
+      if(value[0] == 'd'){
         isDischarge = true;
       }
-      else if (value[0] == '1'){
+      else if (value[0] == 'u'){
         isUpGrade = true;
       }
-      else if (value[0] == '2'){
+      else if (value[0] == 't'){
         isTransmit = true;
       }      
     }
@@ -253,6 +253,14 @@ void BLEinit(){
 /********** Control **********/
 
 void discharge(){
+  pRemoteCharacteristic->writeValue('o');
+  if(notifyFlag){
+    String value = pRemoteCharacteristic->readValue().c_str();
+    time_to_start = value.toInt();
+    #ifdef SERIAL_DEBUG
+      Serial.println("time to start: %d", &time_to_start);
+    #endif
+  }
   adc1_config_channel_atten(ADC1_CHANNEL_0,ADC_ATTEN_DB_0);
   adc1_config_width(ADC_WIDTH_MAX);
   delay(time_to_start);

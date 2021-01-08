@@ -1,6 +1,6 @@
 ## Hardware
 
-- ESP32 Wrover-B / Wroom-U
+- ESP32 Wrover-E （Wrover-B is not recommended)
 - 3.7 V battery
 
 ## Features
