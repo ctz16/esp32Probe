@@ -1,11 +1,12 @@
-// #define SERIAL_DEBUG
-// #define BLE_DEBUG
-
 #include <BLEDevice.h>
 #include <BLEUtils.h>
 #include <BLEServer.h>
 #include <BLE2902.h>
+#include <esp_deep_sleep.h>
 #include <Arduino.h>
+
+#define SERIAL_DEBUG
+// #define BLE_DEBUG
 
 // See the following for generating UUIDs:
 // https://www.uuidgenerator.net/
@@ -19,10 +20,18 @@ BLEService *pService;
 BLECharacteristic *pCharacteristic;
 char buffer[30];
 String cmd;
+String time_to_start;
+String s;
 
 class MyCallbacks: public BLECharacteristicCallbacks {
     void onWrite(BLECharacteristic *pCharacteristic) {
-      Serial.println(pCharacteristic->getValue().c_str());
+      s = pCharacteristic->getValue().c_str();
+      if (s[0]=='o'){
+        pCharacteristic->setValue(time_to_start.c_str());
+      }
+      else{
+        Serial.println(s);
+      }
       pCharacteristic->notify();
     }
 };
@@ -57,12 +66,35 @@ void setup() {
 }
 
 void loop() {
-  // put your main code here, to run repeatedly:
   if (Serial.available() > 0) {
     // read the incoming byte:
     cmd = Serial.readString();
-    if(cmd[0] == 'd' || cmd[0] =='u' || cmd[0]=='t'){
+    switch (cmd[0])
+    {
+    case 'd':
+      Serial.println("discharge mode");
+      time_to_start = Serial.readString();
       BLEinit(cmd);
+      Serial.print("BLE start, time to start:");
+      Serial.println(time_to_start.c_str());
+      break;
+    case 'u':
+      Serial.println("upgrade mode");
+      BLEinit(cmd);
+      break;
+    case 't':
+      Serial.println("transfer mode");
+      BLEinit(cmd);
+      break;
+    case 'o':
+      Serial.println("sleep mode");
+      BLEinit(cmd);
+      delay(60000);
+      esp_deep_sleep_start();
+      break;
+    default:
+      esp_deep_sleep_start();
+      break;
     }
   }
 }

@@ -9,13 +9,14 @@
 #include <driver/adc.h>
 #include <BLEDevice.h>
 
-// #define SERIAL_DEBUG 
+#define SERIAL_DEBUG 
 // #define BLE_DEBUG
 
 #define uS_TO_S_FACTOR 1000000ULL  /* Conversion factor for micro seconds to seconds */
 #define TIME_TO_SLEEP  300        /* Time ESP32 will go to sleep (in seconds) */
-#define DISCHARGE_LOOP_CNT 10000
+#define DISCHARGE_LOOP_CNT 10
 #define WORKING_TIME 180000
+#define TIME_TO_END 5000
 
 const char* host = "esp32";
 const char* ssid = "SUNIST-6";
@@ -210,6 +211,7 @@ bool connectToServer() {
     if(pRemoteCharacteristic->canRead()) {
       String value = pRemoteCharacteristic->readValue().c_str();
       #ifdef SERIAL_DEBUG
+        Serial.print("cmd recived:");
         Serial.println(value);
       #endif
       if(value[0] == 'd'){
@@ -243,11 +245,22 @@ void BLEinit(){
   pBLEScan->start(5, false);
   if(doConnect){
     if(connectToServer()){
+        #ifdef SERIAL_DEBUG
+          Serial.println("probe ready");
+        #endif
       pRemoteCharacteristic->writeValue("probe ready");
     }
     else{
+        #ifdef SERIAL_DEBUG
+          Serial.println("connection failed");
+        #endif
     }
   }
+  #ifdef SERIAL_DEBUG 
+    else{
+      Serial.println("BLE server not found");
+    }
+  #endif
 }
 
 /********** Control **********/
@@ -255,14 +268,17 @@ void BLEinit(){
 void discharge(){
   pRemoteCharacteristic->writeValue('o');
   if(notifyFlag){
+    notifyFlag = false;
     String value = pRemoteCharacteristic->readValue().c_str();
     time_to_start = value.toInt();
-    #ifdef SERIAL_DEBUG
-      Serial.println("time to start: %d", &time_to_start);
-    #endif
   }
+  #ifdef SERIAL_DEBUG
+    Serial.print("time to start: ");
+    Serial.println(time_to_start);
+  #endif
+  BLEDevice::deinit(true);
   adc1_config_channel_atten(ADC1_CHANNEL_0,ADC_ATTEN_DB_0);
-  adc1_config_width(ADC_WIDTH_MAX);
+  adc1_config_width(ADC_WIDTH_BIT_12);
   delay(time_to_start);
   for (int i = 0; i < DISCHARGE_LOOP_CNT; i++)
   {
@@ -270,7 +286,9 @@ void discharge(){
     // adcbuff[i] = adc1_get_raw(ADC1_CHANNEL_0) / 4095 * 1.1;
     adcbuff[i] = adc1_get_raw(ADC1_CHANNEL_0);
   }
+  delay(TIME_TO_END);
   isDischarge = false;
+  BLEinit();
 }
 
 void transmitData(){
@@ -286,6 +304,7 @@ void transmitData(){
   }
   else{
     pRemoteCharacteristic->writeValue("transmit start!");
+    delay(10);
   }
 }
 
@@ -299,26 +318,40 @@ void upGrade(){
 }
 
 void setup(void) {
-  #ifdef SERIAL_DEBUG
-    Serial.begin(115200);
-  #endif
   esp_sleep_enable_timer_wakeup(TIME_TO_SLEEP * uS_TO_S_FACTOR);
   esp_deep_sleep_pd_config(ESP_PD_DOMAIN_RTC_PERIPH, ESP_PD_OPTION_OFF);
+  #ifdef SERIAL_DEBUG
+    Serial.begin(115200);
+    Serial.println("BLE begin");
+  #endif
   BLEinit();
   start_time = millis();
 }
 
 void loop(void) {
   if(isDischarge){
+    #ifdef SERIAL_DEBUG
+      Serial.println("discharge");
+    #endif
     discharge();
   }
   else if(isTransmit){
+    #ifdef SERIAL_DEBUG
+      Serial.println("transmit");
+    #endif
     transmitData();
   }
   else if(isUpGrade){
+    #ifdef SERIAL_DEBUG
+      Serial.println("upgrade");
+    #endif
     upGrade();
   }
   else{
+    #ifdef SERIAL_DEBUG
+      Serial.print("deep sleep start, wait for seconds: ");
+      Serial.println(TIME_TO_SLEEP);
+    #endif
     esp_deep_sleep_start();
   }
 }
