@@ -5,8 +5,8 @@ for a given time to discharge and a given height of the probe, to control the pr
 
 cmd: 
 d -- discharge
-t -- transfer data
 u -- update
+o -- program finished, deep sleep
 cmd and probe height is given to probe server when turned on
 '''
 
@@ -15,9 +15,8 @@ import RPi.GPIO as GPIO
 import time
 
 spin = 11
-stime = 1 #time to discharge in ms
+stime = 500 #time to discharge in ms
 cmd = ""
-discharge_loop_cnt = 10 #total sample points
 
 def reset(ser):
     GPIO.output(spin,GPIO.LOW)
@@ -28,11 +27,23 @@ def reset(ser):
         s = ser.readline()
     print(s)
 
+def writedata(ser,filename,seconds):
+    with open(filename,'w') as f:
+        tic = time.time()
+        while time.time()-tic < seconds:
+            s = ser.readline()
+            f.write(s)
+    
+
 def monitor(ser,seconds):
     tic = time.time()
     while time.time()-tic < seconds:
         if ser.in_waiting:
-            print(ser.readline())
+            s = ser.readline()
+            print(s)
+            if s[0] == 'x':
+                writedata(ser,"data.txt",5)
+                print("data recieved")
     
 def main():
     ser = serial.Serial("/dev/ttyS0",baudrate = 115200, parity = serial.PARITY_NONE,stopbits=serial.STOPBITS_ONE,bytesize=serial.EIGHTBITS,timeout=1)
@@ -46,14 +57,7 @@ def main():
     print("cmd writed: "+cmd)
     monitor(ser,1)
     ser.write(str(stime))
-    monitor(ser,10)
-    reset(ser)
-    
-    cmd = "t"
-    ser.write(cmd)
-    print("cmd writed: "+cmd)
-    print(ser.readline())
-    monitor(ser,10)
+    monitor(ser,20)
 
     reset(ser)
     cmd = "o"

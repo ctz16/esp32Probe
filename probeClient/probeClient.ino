@@ -4,19 +4,18 @@
 #include <ESPmDNS.h>
 #include <Update.h>
 #include <esp_deep_sleep.h>
-//#include <stdio.h>
 #include <esp_spi_flash.h>
 #include <driver/adc.h>
 #include <BLEDevice.h>
 
 #define SERIAL_DEBUG 
-// #define BLE_DEBUG
+#define BLE_DEBUG
 
 #define uS_TO_S_FACTOR 1000000ULL  /* Conversion factor for micro seconds to seconds */
 #define TIME_TO_SLEEP  300        /* Time ESP32 will go to sleep (in seconds) */
-#define DISCHARGE_LOOP_CNT 10
-#define WORKING_TIME 180000
-#define TIME_TO_END 5000
+#define DISCHARGE_LOOP_CNT 10     /* total ADC samples */
+#define WORKING_TIME 180000       /* updateworking time (ms)*/
+#define TIME_TO_END 5000          /* time (in ms) between adc end to transmit start */
 
 const char* host = "esp32";
 const char* ssid = "SUNIST-6";
@@ -60,7 +59,7 @@ const char* serverIndex =
         "<input type='submit' value='Update'>"
     "</form>"
  "<div id='prg'>progress: 0%</div>"
- "<div id='dif'>new text!!!</div>"
+ "<div id='dif'>new text!!</div>"
  "<script>"
   "$('form').submit(function(e){"
   "e.preventDefault();"
@@ -102,7 +101,9 @@ void ServerInit(){
   if(notifyFlag){
     notifyFlag = false;
     #ifdef BLE_DEBUG
-      pRemoteCharacteristic->writeValue(WiFi.localIP().toString().c_str());
+      if(connected){
+        pRemoteCharacteristic->writeValue(WiFi.localIP().toString().c_str());
+      }
     #endif
     #ifdef SERIAL_DEBUG
       Serial.println(WiFi.localIP().toString().c_str());
@@ -127,6 +128,14 @@ void ServerInit(){
   server.on("/update", HTTP_POST, []() {
     server.sendHeader("Connection", "close");
     server.send(200, "text/plain", (Update.hasError()) ? "FAIL" : "OK");
+    #ifdef BLE_DEBUG
+      if(connected){
+        pRemoteCharacteristic->writeValue("success, rebooting");
+      }
+    #endif
+    #ifdef SERIAL_DEBUG
+      Serial.println("success, rebooting");
+    #endif
     ESP.restart();
   }, []() {
     HTTPUpload& upload = server.upload();
@@ -230,9 +239,6 @@ bool connectToServer() {
       else if (value[0] == 'u'){
         isUpGrade = true;
       }
-      else if (value[0] == 't'){
-        isTransmit = true;
-      }      
     }
 
     if(pRemoteCharacteristic->canNotify()){
@@ -296,10 +302,6 @@ void discharge(){
     Serial.print("time to start: ");
     Serial.println(time_to_start);
   #endif
-  if(connected){
-    pClient->disconnect();
-  }
-  BLEDevice::deinit(true);
   adc1_config_channel_atten(ADC1_CHANNEL_0,ADC_ATTEN_DB_0);
   adc1_config_width(ADC_WIDTH_BIT_12);
   delay(time_to_start);
@@ -311,7 +313,9 @@ void discharge(){
   }
   delay(TIME_TO_END);
   isDischarge = false;
-  BLEinit();
+  if(connected){
+    isTransmit = true;
+  }
 }
 
 void transmitData(){
@@ -326,7 +330,10 @@ void transmitData(){
     }
   }
   else{
-    pRemoteCharacteristic->writeValue("transmit start!");
+    pRemoteCharacteristic->writeValue("x");
+    #ifdef SERIAL_DEBUG
+      Serial.println("transmit");
+    #endif
     delay(100);
   }
 }
@@ -334,7 +341,7 @@ void transmitData(){
 void upGrade(){
   isUpGrade = false;
   ServerInit();
-  if(millis()-start_time < WORKING_TIME){
+  while (millis()-start_time < WORKING_TIME){
     server.handleClient();
     delay(1);
   }
@@ -359,9 +366,6 @@ void loop(void) {
     discharge();
   }
   else if(isTransmit){
-    #ifdef SERIAL_DEBUG
-      Serial.println("transmit");
-    #endif
     transmitData();
   }
   else if(isUpGrade){

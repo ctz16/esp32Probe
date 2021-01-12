@@ -5,7 +5,7 @@
 #include <esp_deep_sleep.h>
 #include <Arduino.h>
 
-#define SERIAL_DEBUG
+// #define SERIAL_DEBUG
 // #define BLE_DEBUG
 
 // See the following for generating UUIDs:
@@ -89,10 +89,6 @@ void loop() {
       Serial.println("upgrade mode");
       BLEinit(cmd);
       break;
-    case 't':
-      Serial.println("transfer mode");
-      BLEinit(cmd);
-      break;
     case 'o':
       Serial.println("sleep mode");
       BLEinit(cmd);
@@ -100,6 +96,7 @@ void loop() {
       esp_deep_sleep_start();
       break;
     default:
+      Serial.println("deep sleep start");
       esp_deep_sleep_start();
       break;
     }
