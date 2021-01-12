@@ -26,6 +26,10 @@ String s;
 class MyCallbacks: public BLECharacteristicCallbacks {
     void onWrite(BLECharacteristic *pCharacteristic) {
       s = pCharacteristic->getValue().c_str();
+      #ifdef SERIAL_DEBUG
+        Serial.print("notify message:");
+        Serial.println(s);
+      #endif
       if (s[0]=='o'){
         pCharacteristic->setValue(time_to_start.c_str());
       }
@@ -33,6 +37,9 @@ class MyCallbacks: public BLECharacteristicCallbacks {
         Serial.println(s);
       }
       pCharacteristic->notify();
+      #ifdef SERIAL_DEBUG
+        Serial.println("notified");
+      #endif
     }
 };
 

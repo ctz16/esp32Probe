@@ -33,6 +33,7 @@ static bool doScan = false;
 static bool notifyFlag = false;
 static BLERemoteCharacteristic* pRemoteCharacteristic;
 static BLEAdvertisedDevice* myDevice;
+static BLEClient*  pClient;
 
 static bool isDischarge = false;
 static bool isTransmit = false;
@@ -47,27 +48,6 @@ long start_time = 0;
 // uint16_t tbuff[SPI_FLASH_SEC_SIZE / 4];
 
 /********** Web Server **********/
-
-/**
- * Scan for BLE servers and find the first one that advertises the service we are looking for.
- */
-class MyAdvertisedDeviceCallbacks: public BLEAdvertisedDeviceCallbacks {
- /**
-   * Called for each advertising BLE server.
-   */
-  void onResult(BLEAdvertisedDevice advertisedDevice) {
-
-    // We have found a device, let us now see if it contains the service we are looking for.
-    if (advertisedDevice.haveServiceUUID() && advertisedDevice.isAdvertisingService(serviceUUID)) {
-
-      BLEDevice::getScan()->stop();
-      myDevice = new BLEAdvertisedDevice(advertisedDevice);
-      doConnect = true;
-      doScan = true;
-
-    } // Found our server
-  } // onResult
-}; // MyAdvertisedDeviceCallbacks
 
 /*
  * Server Index Page
@@ -171,6 +151,27 @@ void ServerInit(){
 
 /********** BLE **********/
 
+/**
+ * Scan for BLE servers and find the first one that advertises the service we are looking for.
+ */
+class MyAdvertisedDeviceCallbacks: public BLEAdvertisedDeviceCallbacks {
+ /**
+   * Called for each advertising BLE server.
+   */
+  void onResult(BLEAdvertisedDevice advertisedDevice) {
+
+    // We have found a device, let us now see if it contains the service we are looking for.
+    if (advertisedDevice.haveServiceUUID() && advertisedDevice.isAdvertisingService(serviceUUID)) {
+
+      BLEDevice::getScan()->stop();
+      myDevice = new BLEAdvertisedDevice(advertisedDevice);
+      doConnect = true;
+      doScan = true;
+
+    } // Found our server
+  } // onResult
+}; // MyAdvertisedDeviceCallbacks
+
 static void notifyCallback(
   BLERemoteCharacteristic* pBLERemoteCharacteristic,
   uint8_t* pData,
@@ -185,17 +186,23 @@ class MyClientCallback : public BLEClientCallbacks {
 
   void onDisconnect(BLEClient* pclient) {
     connected = false;
+    #ifdef SERIAL_DEBUG
+      Serial.println("onDisconnect");
+    #endif
   }
 };
 
 bool connectToServer() {
-    BLEClient*  pClient  = BLEDevice::createClient();
+    pClient = BLEDevice::createClient();
     pClient->setClientCallbacks(new MyClientCallback());
     pClient->connect(myDevice);  // if you pass BLEAdvertisedDevice instead of address, it will be recognized type of peer device address (public or private)
 
     // Obtain a reference to the service we are after in the remote BLE server.
     BLERemoteService* pRemoteService = pClient->getService(serviceUUID);
     if (pRemoteService == nullptr) {
+      #ifdef SERIAL_DEBUG
+        Serial.println("Failed to find our service UUID");
+      #endif
       pClient->disconnect();
       return false;
     }
@@ -203,6 +210,9 @@ bool connectToServer() {
     // Obtain a reference to the characteristic in the service of the remote BLE server.
     pRemoteCharacteristic = pRemoteService->getCharacteristic(charUUID);
     if (pRemoteCharacteristic == nullptr) {
+      #ifdef SERIAL_DEBUG
+        Serial.println("Failed to find our characteristic UUID");
+      #endif
       pClient->disconnect();
       return false;
     }
@@ -224,15 +234,20 @@ bool connectToServer() {
         isTransmit = true;
       }      
     }
-    if(pRemoteCharacteristic->canNotify())
-      pRemoteCharacteristic->registerForNotify(notifyCallback);
 
+    if(pRemoteCharacteristic->canNotify()){
+      pRemoteCharacteristic->registerForNotify(notifyCallback);
+      #ifdef SERIAL_DEBUG
+        Serial.println("notify registrited!");
+      #endif
+    }
+      
     connected = true;
     return true;
 }
 
 void BLEinit(){
-  BLEDevice::init("");
+  BLEDevice::init("probeclient");
 
   // Retrieve a Scanner and set the callback we want to use to be informed when we
   // have detected a new device.  Specify that we want active scanning and start the
@@ -261,14 +276,19 @@ void BLEinit(){
       Serial.println("BLE server not found");
     }
   #endif
+  doConnect = false;
 }
 
 /********** Control **********/
 
 void discharge(){
-  pRemoteCharacteristic->writeValue('o');
+  pRemoteCharacteristic->writeValue("o");
+  delay(100);
   if(notifyFlag){
     notifyFlag = false;
+    #ifdef SERIAL_DEBUG
+      Serial.println("notify recieved");
+    #endif
     String value = pRemoteCharacteristic->readValue().c_str();
     time_to_start = value.toInt();
   }
@@ -276,6 +296,9 @@ void discharge(){
     Serial.print("time to start: ");
     Serial.println(time_to_start);
   #endif
+  if(connected){
+    pClient->disconnect();
+  }
   BLEDevice::deinit(true);
   adc1_config_channel_atten(ADC1_CHANNEL_0,ADC_ATTEN_DB_0);
   adc1_config_width(ADC_WIDTH_BIT_12);
@@ -304,7 +327,7 @@ void transmitData(){
   }
   else{
     pRemoteCharacteristic->writeValue("transmit start!");
-    delay(10);
+    delay(100);
   }
 }
 

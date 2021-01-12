@@ -27,6 +27,12 @@ def reset(ser):
     for i in range(15): #gap 15 lines ROM boot log
         s = ser.readline()
     print(s)
+
+def monitor(ser,seconds):
+    tic = time.time()
+    while time.time()-tic < seconds:
+        if ser.in_waiting:
+            print(ser.readline())
     
 def main():
     ser = serial.Serial("/dev/ttyS0",baudrate = 115200, parity = serial.PARITY_NONE,stopbits=serial.STOPBITS_ONE,bytesize=serial.EIGHTBITS,timeout=1)
@@ -38,30 +44,22 @@ def main():
     cmd = "d"
     ser.write(cmd)
     print("cmd writed: "+cmd)
-    print(ser.readline())
+    monitor(ser,1)
     ser.write(str(stime))
-    time.sleep(10)
+    monitor(ser,10)
     reset(ser)
     
     cmd = "t"
     ser.write(cmd)
     print("cmd writed: "+cmd)
     print(ser.readline())
-    # with open("data.txt",'w') as f:
-    #     s = ""
-    #     for i in range(discharge_loop_cnt):
-    #         s = ser.readline()
-    #         f.write(s)
-    for i in range(discharge_loop_cnt):
-        s = ser.readline()
-        print(s)
+    monitor(ser,10)
 
-    time.sleep(5)
     reset(ser)
     cmd = "o"
     ser.write(cmd)
     print("cmd writed: "+cmd)
-    print(ser.readline())
+    monitor(ser,1)
     
 if __name__ == "__main__":
     main()        
