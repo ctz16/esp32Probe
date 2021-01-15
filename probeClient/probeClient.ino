@@ -13,7 +13,7 @@
 
 #define uS_TO_S_FACTOR 1000000ULL  /* Conversion factor for micro seconds to seconds */
 #define TIME_TO_SLEEP  300        /* Time ESP32 will go to sleep (in seconds) */
-#define DISCHARGE_LOOP_CNT 10     /* total ADC samples */
+#define DISCHARGE_LOOP_CNT 500     /* total ADC samples */
 #define WORKING_TIME 180000       /* updateworking time (ms)*/
 #define TIME_TO_END 5000          /* time (in ms) between adc end to transmit start */
 
@@ -30,6 +30,7 @@ static bool doConnect = false;
 static bool connected = false;
 static bool doScan = false;
 static bool notifyFlag = false;
+static bool transmit_start_flag = false;
 static BLERemoteCharacteristic* pRemoteCharacteristic;
 static BLEAdvertisedDevice* myDevice;
 static BLEClient*  pClient;
@@ -41,9 +42,10 @@ static bool isUpGrade = false;
 uint16_t adcbuff[DISCHARGE_LOOP_CNT];
 uint16_t cnt = 0;
 long time_to_start = 0;
+long transmit_start_time = 0;
 long adc_start_time = 0;
-long adc_end_time = 0;
 long start_time = 0;
+char tbuff[10];
 // uint16_t tbuff[SPI_FLASH_SEC_SIZE / 4];
 
 /********** Web Server **********/
@@ -289,7 +291,9 @@ void BLEinit(){
 
 void discharge(){
   pRemoteCharacteristic->writeValue("o");
-  delay(100);
+  delay(50);
+  adc1_config_channel_atten(ADC1_CHANNEL_0,ADC_ATTEN_DB_0);
+  adc1_config_width(ADC_WIDTH_BIT_12);
   if(notifyFlag){
     notifyFlag = false;
     #ifdef SERIAL_DEBUG
@@ -302,8 +306,6 @@ void discharge(){
     Serial.print("time to start: ");
     Serial.println(time_to_start);
   #endif
-  adc1_config_channel_atten(ADC1_CHANNEL_0,ADC_ATTEN_DB_0);
-  adc1_config_width(ADC_WIDTH_BIT_12);
   delay(time_to_start);
   for (int i = 0; i < DISCHARGE_LOOP_CNT; i++)
   {
@@ -319,22 +321,34 @@ void discharge(){
 }
 
 void transmitData(){
-  if(notifyFlag){
-    notifyFlag = false;
-    String s = String(adcbuff[cnt]);
-    pRemoteCharacteristic->writeValue(s.c_str(),s.length());
-    cnt++;
-    if(cnt == DISCHARGE_LOOP_CNT){
-      isTransmit = false;
-      cnt=0;
+  if(connected){
+    if(notifyFlag){
+      notifyFlag = false;
+      itoa(adcbuff[cnt],tbuff,10);
+      pRemoteCharacteristic->writeValue(tbuff);
+      cnt++;
+      if(cnt == DISCHARGE_LOOP_CNT){
+        isTransmit = false;
+        transmit_start_flag = false;
+        #ifdef SERIAL_DEBUG
+          Serial.print("transmition finish, cost:");
+          Serial.println(millis()-transmit_start_time);
+        #endif        
+        cnt=0;
+      }
+    }
+    else if(!transmit_start_flag){
+      transmit_start_time = millis();
+      pRemoteCharacteristic->writeValue("x");
+      transmit_start_flag = true;
+      #ifdef SERIAL_DEBUG
+        Serial.println("transmit start");
+      #endif
+      delay(50);
     }
   }
   else{
-    pRemoteCharacteristic->writeValue("x");
-    #ifdef SERIAL_DEBUG
-      Serial.println("transmit");
-    #endif
-    delay(100);
+    isTransmit = false;
   }
 }
 

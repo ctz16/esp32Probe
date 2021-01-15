@@ -32,5 +32,11 @@ def main():
     print("cmd writed: "+cmd)
     monitor(ser,180)
 
+    reset(ser)
+    cmd = "o"
+    ser.write(cmd)
+    print("cmd writed: "+cmd)
+    monitor(ser,1)
+
 if __name__ == "__main__":
     main()  

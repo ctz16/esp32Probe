@@ -14,6 +14,8 @@
 #define SERVICE_UUID        "5b187b6d-1dfa-4cb8-af03-f38e29b514c8"
 #define CHARACTERISTIC_UUID "04b2bcfc-1b74-4203-8b10-6d8e09b5be2b"
 
+#define TIME_TO_TRANSMIT 40000
+
 BLEDevice *myBLE;
 BLEServer *pServer;
 BLEService *pService;
@@ -22,6 +24,10 @@ char buffer[30];
 String cmd;
 String time_to_start;
 String s;
+bool transmitFlag = false;
+int cnt = 0;
+int databuff[10000];
+long start_time = 0;
 
 class MyCallbacks: public BLECharacteristicCallbacks {
     void onWrite(BLECharacteristic *pCharacteristic) {
@@ -30,11 +36,21 @@ class MyCallbacks: public BLECharacteristicCallbacks {
         Serial.print("notify message:");
         Serial.println(s);
       #endif
-      if (s[0]=='o'){
-        pCharacteristic->setValue(time_to_start.c_str());
+      if (transmitFlag){
+        databuff[cnt] = s.toInt();
+        cnt++;
       }
       else{
-        Serial.println(s);
+        if (s[0]=='o'){
+          pCharacteristic->setValue(time_to_start.c_str());
+        }
+        else if(s[0]=='x'){
+          transmitFlag = true;
+          cnt=0;
+        }
+        else{
+          Serial.println(s);
+        }
       }
       pCharacteristic->notify();
       #ifdef SERIAL_DEBUG
@@ -70,6 +86,7 @@ void BLEinit(String cmd){
 void setup() {
   Serial.begin(115200);
   Serial.println("Starting work!");
+  start_time = millis();
 }
 
 void loop() {
@@ -85,20 +102,26 @@ void loop() {
       Serial.print("BLE start, time to start:");
       Serial.println(time_to_start.c_str());
       break;
-    case 'u':
-      Serial.println("upgrade mode");
-      BLEinit(cmd);
-      break;
     case 'o':
       Serial.println("sleep mode");
       BLEinit(cmd);
       delay(60000);
-      esp_deep_sleep_start();
       break;
     default:
       Serial.println("deep sleep start");
       esp_deep_sleep_start();
       break;
     }
+  }
+  else if (millis()-start_time > TIME_TO_TRANSMIT){
+    Serial.println("x");
+    for (int i = 0; i < cnt; i++)
+    {
+      Serial.println(databuff[i]);
+    }
+    Serial.print("cnt: ");
+    Serial.println(cnt);
+    Serial.println("deep sleep start");
+    esp_deep_sleep_start();
   }
 }
