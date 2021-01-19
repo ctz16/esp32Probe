@@ -324,10 +324,15 @@ void transmitData(){
   if(connected){
     if(notifyFlag){
       notifyFlag = false;
-      itoa(adcbuff[cnt],tbuff,10);
-      pRemoteCharacteristic->writeValue(tbuff);
+      String s = " ";
+      for (int i = 0; i < 50; i++)
+      {
+        s += adcbuff[50*cnt+i];
+        s += ",";
+      }
       cnt++;
-      if(cnt == DISCHARGE_LOOP_CNT){
+      pRemoteCharacteristic->writeValue(s.c_str());
+      if(cnt == DISCHARGE_LOOP_CNT / 50){
         isTransmit = false;
         transmit_start_flag = false;
         #ifdef SERIAL_DEBUG

@@ -23,39 +23,15 @@ BLECharacteristic *pCharacteristic;
 char buffer[30];
 String cmd;
 String time_to_start;
-String s;
+String s[500];
 bool transmitFlag = false;
 int cnt = 0;
-int databuff[10000];
 long start_time = 0;
+bool readFlag = false;
 
 class MyCallbacks: public BLECharacteristicCallbacks {
     void onWrite(BLECharacteristic *pCharacteristic) {
-      s = pCharacteristic->getValue().c_str();
-      #ifdef SERIAL_DEBUG
-        Serial.print("notify message:");
-        Serial.println(s);
-      #endif
-      if (transmitFlag){
-        databuff[cnt] = s.toInt();
-        cnt++;
-      }
-      else{
-        if (s[0]=='o'){
-          pCharacteristic->setValue(time_to_start.c_str());
-        }
-        else if(s[0]=='x'){
-          transmitFlag = true;
-          cnt=0;
-        }
-        else{
-          Serial.println(s);
-        }
-      }
-      pCharacteristic->notify();
-      #ifdef SERIAL_DEBUG
-        Serial.println("notified");
-      #endif
+      readFlag = true;
     }
 };
 
@@ -90,7 +66,34 @@ void setup() {
 }
 
 void loop() {
-  if (Serial.available() > 0) {
+  if (readFlag){
+    readFlag = false;
+    s[cnt] = pCharacteristic->getValue().c_str();
+    #ifdef SERIAL_DEBUG
+      Serial.print("notify message:");
+      Serial.println(s);
+    #endif
+    if (transmitFlag){
+      cnt++;
+    }
+    else{
+      if (s[cnt][0]=='o'){
+        pCharacteristic->setValue(time_to_start.c_str());
+      }
+      else if(s[cnt][0]=='x'){
+        transmitFlag = true;
+        cnt=0;
+      }
+      else{
+        Serial.println(s[cnt]);
+      }
+    }
+    pCharacteristic->notify();
+    #ifdef SERIAL_DEBUG
+      Serial.println("notified");
+    #endif
+  }
+  else if (Serial.available() > 0) {
     // read the incoming byte:
     cmd = Serial.readString();
     switch (cmd[0])
@@ -117,7 +120,7 @@ void loop() {
     Serial.println("x");
     for (int i = 0; i < cnt; i++)
     {
-      Serial.println(databuff[i]);
+      Serial.println(s[i]);
     }
     Serial.print("cnt: ");
     Serial.println(cnt);

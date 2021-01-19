@@ -1,5 +1,6 @@
 {
     "board": "esp32:esp32:esp32wrover",
-    "configuration": "PartitionScheme=huge_app,FlashMode=qio,FlashFreq=80,UploadSpeed=921600,DebugLevel=none",
-    "programmer": "AVR ISP"
+    "configuration": "PartitionScheme=default_16MB,FlashMode=qio,FlashFreq=80,UploadSpeed=921600,DebugLevel=none",
+    "programmer": "AVR ISP",
+    "port": "COM5"
 }
