@@ -12,10 +12,11 @@
 #define BLE_DEBUG
 
 #define uS_TO_S_FACTOR 1000000ULL  /* Conversion factor for micro seconds to seconds */
-#define TIME_TO_SLEEP  300        /* Time ESP32 will go to sleep (in seconds) */
-#define DISCHARGE_LOOP_CNT 500     /* total ADC samples */
-#define WORKING_TIME 180000       /* updateworking time (ms)*/
-#define TIME_TO_END 5000          /* time (in ms) between adc end to transmit start */
+#define TIME_TO_SLEEP  20        /* Time ESP32 will go to sleep (in seconds) */
+#define DISCHARGE_LOOP_CNT 20000     /* total ADC samples */
+#define WORKING_TIME 180000       /* OTA update working time (ms)*/
+#define INTERVAL_AFTER_DISCHARGE 5000          /* time (in ms) between adc end to transmit start */
+#define PAC_LEN 100               /* data count in each package */
 
 const char* host = "esp32";
 const char* ssid = "SUNIST-6";
@@ -41,12 +42,9 @@ static bool isUpGrade = false;
 
 uint16_t adcbuff[DISCHARGE_LOOP_CNT];
 uint16_t cnt = 0;
-long time_to_start = 0;
+long interval_to_discharge = 0;
 long transmit_start_time = 0;
-long adc_start_time = 0;
-long start_time = 0;
-char tbuff[10];
-// uint16_t tbuff[SPI_FLASH_SEC_SIZE / 4];
+long sys_start_time = 0;
 
 /********** Web Server **********/
 
@@ -262,10 +260,10 @@ void BLEinit(){
   // scan to run for 5 seconds.
   BLEScan* pBLEScan = BLEDevice::getScan();
   pBLEScan->setAdvertisedDeviceCallbacks(new MyAdvertisedDeviceCallbacks());
-  pBLEScan->setInterval(1349);
-  pBLEScan->setWindow(449);
+  pBLEScan->setInterval(50);
+  pBLEScan->setWindow(200);
   pBLEScan->setActiveScan(true);
-  pBLEScan->start(5, false);
+  pBLEScan->start(2, false);
   if(doConnect){
     if(connectToServer()){
         #ifdef SERIAL_DEBUG
@@ -300,20 +298,22 @@ void discharge(){
       Serial.println("notify recieved");
     #endif
     String value = pRemoteCharacteristic->readValue().c_str();
-    time_to_start = value.toInt();
+    interval_to_discharge = value.toInt();
   }
   #ifdef SERIAL_DEBUG
     Serial.print("time to start: ");
-    Serial.println(time_to_start);
+    Serial.println(interval_to_discharge);
   #endif
-  delay(time_to_start);
+  if(interval_to_discharge > 0){
+    delay(interval_to_discharge);
+  }
   for (int i = 0; i < DISCHARGE_LOOP_CNT; i++)
   {
     // we shall do the calculation outside
     // adcbuff[i] = adc1_get_raw(ADC1_CHANNEL_0) / 4095 * 1.1;
     adcbuff[i] = adc1_get_raw(ADC1_CHANNEL_0);
   }
-  delay(TIME_TO_END);
+  delay(INTERVAL_AFTER_DISCHARGE);
   isDischarge = false;
   if(connected){
     isTransmit = true;
@@ -324,15 +324,15 @@ void transmitData(){
   if(connected){
     if(notifyFlag){
       notifyFlag = false;
-      String s = " ";
-      for (int i = 0; i < 50; i++)
+      String s = "";
+      for (int i = 0; i < PAC_LEN; i++)
       {
-        s += adcbuff[50*cnt+i];
+        s += adcbuff[PAC_LEN*cnt+i];
         s += ",";
       }
       cnt++;
       pRemoteCharacteristic->writeValue(s.c_str());
-      if(cnt == DISCHARGE_LOOP_CNT / 50){
+      if(cnt == DISCHARGE_LOOP_CNT / PAC_LEN){
         isTransmit = false;
         transmit_start_flag = false;
         #ifdef SERIAL_DEBUG
@@ -360,7 +360,7 @@ void transmitData(){
 void upGrade(){
   isUpGrade = false;
   ServerInit();
-  while (millis()-start_time < WORKING_TIME){
+  while (millis()-sys_start_time < WORKING_TIME){
     server.handleClient();
     delay(1);
   }
@@ -374,7 +374,7 @@ void setup(void) {
     Serial.println("BLE begin");
   #endif
   BLEinit();
-  start_time = millis();
+  sys_start_time = millis();
 }
 
 void loop(void) {

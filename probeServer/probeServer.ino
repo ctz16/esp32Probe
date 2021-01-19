@@ -14,7 +14,7 @@
 #define SERVICE_UUID        "5b187b6d-1dfa-4cb8-af03-f38e29b514c8"
 #define CHARACTERISTIC_UUID "04b2bcfc-1b74-4203-8b10-6d8e09b5be2b"
 
-#define TIME_TO_TRANSMIT 40000
+#define TIME_TO_TRANSMIT 30000
 
 BLEDevice *myBLE;
 BLEServer *pServer;
@@ -22,11 +22,11 @@ BLEService *pService;
 BLECharacteristic *pCharacteristic;
 char buffer[30];
 String cmd;
-String time_to_start;
 String s[500];
 bool transmitFlag = false;
 int cnt = 0;
-long start_time = 0;
+int time_to_start = 0;
+long sys_start_time = 0;
 bool readFlag = false;
 
 class MyCallbacks: public BLECharacteristicCallbacks {
@@ -62,7 +62,7 @@ void BLEinit(String cmd){
 void setup() {
   Serial.begin(115200);
   Serial.println("Starting work!");
-  start_time = millis();
+  sys_start_time = millis();
 }
 
 void loop() {
@@ -78,7 +78,9 @@ void loop() {
     }
     else{
       if (s[cnt][0]=='o'){
-        pCharacteristic->setValue(time_to_start.c_str());
+        char tbuff[10];
+        itoa(time_to_start-(millis()-sys_start_time),tbuff,10);
+        pCharacteristic->setValue(tbuff);
       }
       else if(s[cnt][0]=='x'){
         transmitFlag = true;
@@ -100,15 +102,19 @@ void loop() {
     {
     case 'd':
       Serial.println("discharge mode");
-      time_to_start = Serial.readString();
+      Serial.println("X");
+      delay(50);
+      s[0] = Serial.readString();
+      sys_start_time = millis();
+      time_to_start = s[0].toInt();
       BLEinit(cmd);
       Serial.print("BLE start, time to start:");
-      Serial.println(time_to_start.c_str());
+      Serial.println(time_to_start);
       break;
     case 'o':
       Serial.println("sleep mode");
       BLEinit(cmd);
-      delay(60000);
+      delay(30000);
       break;
     default:
       Serial.println("deep sleep start");
@@ -116,7 +122,7 @@ void loop() {
       break;
     }
   }
-  else if (millis()-start_time > TIME_TO_TRANSMIT){
+  else if (millis()-sys_start_time > TIME_TO_TRANSMIT){
     Serial.println("x");
     for (int i = 0; i < cnt; i++)
     {

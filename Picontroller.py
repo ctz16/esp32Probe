@@ -41,8 +41,10 @@ def monitor(ser,seconds):
         if ser.in_waiting:
             s = ser.readline()
             print(s)
-            if s[0] == 'x':
-                writedata(ser,"data.txt",5)
+            if s[0] == 'X':
+                ser.write(str(stime))
+            elif s[0] == 'x':
+                writedata(ser,"data.txt",10)
                 print("data recieved")
     
 def main():
@@ -50,14 +52,12 @@ def main():
     GPIO.setmode(GPIO.BOARD)
     GPIO.setup(spin,GPIO.OUT)
     GPIO.output(spin,GPIO.HIGH)
-    reset(ser)
     
+    reset(ser)
     cmd = "d"
     ser.write(cmd)
     print("cmd writed: "+cmd)
-    monitor(ser,1)
-    ser.write(str(stime))
-    monitor(ser,20)
+    monitor(ser,40)
 
     reset(ser)
     cmd = "o"
