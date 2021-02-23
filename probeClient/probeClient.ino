@@ -8,14 +8,14 @@
 #include <driver/adc.h>
 #include <BLEDevice.h>
 
-#define SERIAL_DEBUG 
+// #define SERIAL_DEBUG 
 #define BLE_DEBUG
 
 #define uS_TO_S_FACTOR 1000000ULL  /* Conversion factor for micro seconds to seconds */
-#define TIME_TO_SLEEP  20        /* Time ESP32 will go to sleep (in seconds) */
+#define TIME_TO_SLEEP  60        /* Time ESP32 will go to sleep (in seconds) */
 #define DISCHARGE_LOOP_CNT 20000     /* total ADC samples */
 #define WORKING_TIME 180000       /* OTA update working time (ms)*/
-#define INTERVAL_AFTER_DISCHARGE 5000          /* time (in ms) between adc end to transmit start */
+#define INTERVAL_AFTER_DISCHARGE 2000          /* time (in ms) between adc end to transmit start */
 #define PAC_LEN 100               /* data count in each package */
 
 const char* host = "esp32";
@@ -44,6 +44,8 @@ uint16_t adcbuff[DISCHARGE_LOOP_CNT];
 uint16_t cnt = 0;
 long interval_to_discharge = 0;
 long transmit_start_time = 0;
+long adc_start_time = 0;
+long adc_end_time = 0;
 long sys_start_time = 0;
 
 /********** Web Server **********/
@@ -59,7 +61,7 @@ const char* serverIndex =
         "<input type='submit' value='Update'>"
     "</form>"
  "<div id='prg'>progress: 0%</div>"
- "<div id='dif'>new text!!</div>"
+ "<div id='dif'>Hello Mars</div>"
  "<script>"
   "$('form').submit(function(e){"
   "e.preventDefault();"
@@ -307,12 +309,14 @@ void discharge(){
   if(interval_to_discharge > 0){
     delay(interval_to_discharge);
   }
+  adc_start_time = millis();
   for (int i = 0; i < DISCHARGE_LOOP_CNT; i++)
   {
     // we shall do the calculation outside
     // adcbuff[i] = adc1_get_raw(ADC1_CHANNEL_0) / 4095 * 1.1;
     adcbuff[i] = adc1_get_raw(ADC1_CHANNEL_0);
   }
+  adc_end_time = millis();
   delay(INTERVAL_AFTER_DISCHARGE);
   isDischarge = false;
   if(connected){
@@ -333,6 +337,12 @@ void transmitData(){
       cnt++;
       pRemoteCharacteristic->writeValue(s.c_str());
       if(cnt == DISCHARGE_LOOP_CNT / PAC_LEN){
+        delay(50);
+        char tbuff[10];
+        itoa(adc_end_time-adc_start_time,tbuff,10);
+        pRemoteCharacteristic->writeValue(tbuff);
+        delay(50);
+        pRemoteCharacteristic->writeValue("Transmition End");
         isTransmit = false;
         transmit_start_flag = false;
         #ifdef SERIAL_DEBUG

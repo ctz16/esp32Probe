@@ -15,7 +15,7 @@ import RPi.GPIO as GPIO
 import time
 
 spin = 11
-stime = 500 #time to discharge in ms
+stime = 20000 #time to discharge in ms
 cmd = ""
 
 def reset(ser):
@@ -57,7 +57,7 @@ def main():
     cmd = "d"
     ser.write(cmd)
     print("cmd writed: "+cmd)
-    monitor(ser,40)
+    monitor(ser,50)
 
     reset(ser)
     cmd = "o"
@@ -67,4 +67,3 @@ def main():
     
 if __name__ == "__main__":
     main()        
-

@@ -14,7 +14,8 @@
 #define SERVICE_UUID        "5b187b6d-1dfa-4cb8-af03-f38e29b514c8"
 #define CHARACTERISTIC_UUID "04b2bcfc-1b74-4203-8b10-6d8e09b5be2b"
 
-#define TIME_TO_TRANSMIT 30000
+#define TIME_TO_TRANSMIT 40000
+#define TIME_TO_UPDATE 180000
 
 BLEDevice *myBLE;
 BLEServer *pServer;
@@ -66,35 +67,47 @@ void setup() {
 }
 
 void loop() {
+  /***** ble controller *****/
   if (readFlag){
+    // data come in from probe client
     readFlag = false;
     s[cnt] = pCharacteristic->getValue().c_str();
     #ifdef SERIAL_DEBUG
       Serial.print("notify message:");
       Serial.println(s);
     #endif
+
     if (transmitFlag){
+      // client data transmitting
       cnt++;
     }
+
     else{
       if (s[cnt][0]=='o'){
+        // client asks for time to discharge
         char tbuff[10];
         itoa(time_to_start-(millis()-sys_start_time),tbuff,10);
         pCharacteristic->setValue(tbuff);
       }
       else if(s[cnt][0]=='x'){
+        // client tells to transmit data
         transmitFlag = true;
         cnt=0;
       }
       else{
+        // other messages
         Serial.println(s[cnt]);
       }
     }
+
+    //ready for recieve next data
     pCharacteristic->notify();
     #ifdef SERIAL_DEBUG
       Serial.println("notified");
     #endif
   }
+
+  /***** raspberry pi controller *****/
   else if (Serial.available() > 0) {
     // read the incoming byte:
     cmd = Serial.readString();
@@ -102,7 +115,7 @@ void loop() {
     {
     case 'd':
       Serial.println("discharge mode");
-      Serial.println("X");
+      Serial.println("X"); //ask for time to discharge
       delay(50);
       s[0] = Serial.readString();
       sys_start_time = millis();
@@ -110,6 +123,11 @@ void loop() {
       BLEinit(cmd);
       Serial.print("BLE start, time to start:");
       Serial.println(time_to_start);
+      break;
+    case 'u':
+      Serial.println("update mode");
+      BLEinit(cmd);
+      sys_start_time = millis();
       break;
     case 'o':
       Serial.println("sleep mode");
@@ -122,7 +140,9 @@ void loop() {
       break;
     }
   }
-  else if (millis()-sys_start_time > TIME_TO_TRANSMIT){
+
+  // transmit data to pi
+  else if (millis()-sys_start_time > TIME_TO_TRANSMIT && cmd[0] == 'd'){
     Serial.println("x");
     for (int i = 0; i < cnt; i++)
     {
@@ -130,6 +150,11 @@ void loop() {
     }
     Serial.print("cnt: ");
     Serial.println(cnt);
+    Serial.println("deep sleep start");
+    esp_deep_sleep_start();
+  }
+
+  else if (millis()-sys_start_time > TIME_TO_UPDATE && cmd[0] == 'u'){
     Serial.println("deep sleep start");
     esp_deep_sleep_start();
   }
