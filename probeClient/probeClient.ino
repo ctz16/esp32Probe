@@ -8,7 +8,7 @@
 #include <driver/adc.h>
 #include <BLEDevice.h>
 
-// #define SERIAL_DEBUG 
+#define SERIAL_DEBUG 
 #define BLE_DEBUG
 
 #define uS_TO_S_FACTOR 1000000ULL  /* Conversion factor for micro seconds to seconds */
@@ -259,7 +259,7 @@ void BLEinit(){
 
   // Retrieve a Scanner and set the callback we want to use to be informed when we
   // have detected a new device.  Specify that we want active scanning and start the
-  // scan to run for 5 seconds.
+  // scan to run for 2 seconds.
   BLEScan* pBLEScan = BLEDevice::getScan();
   pBLEScan->setAdvertisedDeviceCallbacks(new MyAdvertisedDeviceCallbacks());
   pBLEScan->setInterval(50);
@@ -341,6 +341,10 @@ void transmitData(){
         char tbuff[10];
         itoa(adc_end_time-adc_start_time,tbuff,10);
         pRemoteCharacteristic->writeValue(tbuff);
+        #ifdef SERIAL_DEBUG
+          Serial.print("adc sample cost: ");
+          Serial.println(tbuff);
+        #endif
         delay(50);
         pRemoteCharacteristic->writeValue("Transmition End");
         isTransmit = false;

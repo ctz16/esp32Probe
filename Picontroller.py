@@ -1,3 +1,5 @@
+# -*- coding: UTF-8 -*-
+
 '''
 @author: Chang
 
@@ -13,10 +15,28 @@ cmd and probe height is given to probe server when turned on
 import serial
 import RPi.GPIO as GPIO
 import time
+import numpy as np
+from matplotlib import pyplot as plt
 
 spin = 11
 stime = 20000 #time to discharge in ms
 cmd = ""
+num_samples = 20000
+num_lines = 200
+ADvalue = []
+datafile = "data.txt"
+
+def plotVal(filename):
+    with open("data.txt",'r') as f:
+        for i in range(num_lines):
+            for x in f.readline().split(','):
+                if x != '\n':
+                    ADvalue.append(int(x))
+        time = int(f.readline())
+    plt.plot(np.linspace(0,time,num_samples),ADvalue)
+    plt.xlabel("time[ms]")
+    plt.ylabel("AD_val")
+    plt.show()
 
 def reset(ser):
     GPIO.output(spin,GPIO.LOW)
@@ -24,14 +44,14 @@ def reset(ser):
     GPIO.output(spin,GPIO.HIGH)
     time.sleep(0.01)
     for i in range(15): #gap 15 lines ROM boot log
-        s = ser.readline()
+        s = ser.readline().decode()
     print(s)
 
 def writedata(ser,filename,seconds):
     with open(filename,'w') as f:
         tic = time.time()
         while time.time()-tic < seconds:
-            s = ser.readline()
+            s = ser.readline().decode()
             f.write(s)
     
 
@@ -39,12 +59,12 @@ def monitor(ser,seconds):
     tic = time.time()
     while time.time()-tic < seconds:
         if ser.in_waiting:
-            s = ser.readline()
+            s = ser.readline().decode()
             print(s)
             if s[0] == 'X':
-                ser.write(str(stime))
+                ser.write(str(stime).encode())
             elif s[0] == 'x':
-                writedata(ser,"data.txt",10)
+                writedata(ser,datafile,10)
                 print("data recieved")
     
 def main():
@@ -55,15 +75,17 @@ def main():
     
     reset(ser)
     cmd = "d"
-    ser.write(cmd)
+    ser.write(cmd.encode())
     print("cmd writed: "+cmd)
-    monitor(ser,50)
+    monitor(ser,60)
 
     reset(ser)
     cmd = "o"
-    ser.write(cmd)
+    ser.write(cmd.encode())
     print("cmd writed: "+cmd)
     monitor(ser,1)
+
+    plotVal(datafile)
     
 if __name__ == "__main__":
     main()        
