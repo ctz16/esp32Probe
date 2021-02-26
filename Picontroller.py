@@ -18,8 +18,8 @@ import time
 import numpy as np
 from matplotlib import pyplot as plt
 
-spin = 11
-stime = 20000 #time to discharge in ms
+spin = 11 # reset pin / EN
+stime = 20000 # time to discharge in ms
 cmd = ""
 num_samples = 20000
 num_lines = 200
@@ -36,6 +36,7 @@ def plotVal(filename):
     plt.plot(np.linspace(0,time,num_samples),ADvalue)
     plt.xlabel("time[ms]")
     plt.ylabel("AD_val")
+    plt.grid()
     plt.show()
 
 def reset(ser):
@@ -69,6 +70,7 @@ def monitor(ser,seconds):
     
 def main():
     ser = serial.Serial("/dev/ttyS0",baudrate = 115200, parity = serial.PARITY_NONE,stopbits=serial.STOPBITS_ONE,bytesize=serial.EIGHTBITS,timeout=1)
+    GPIO.setwarnings(False)
     GPIO.setmode(GPIO.BOARD)
     GPIO.setup(spin,GPIO.OUT)
     GPIO.output(spin,GPIO.HIGH)
@@ -77,7 +79,7 @@ def main():
     cmd = "d"
     ser.write(cmd.encode())
     print("cmd writed: "+cmd)
-    monitor(ser,60)
+    monitor(ser,70)
 
     reset(ser)
     cmd = "o"

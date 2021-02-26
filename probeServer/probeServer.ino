@@ -14,7 +14,7 @@
 #define SERVICE_UUID        "5b187b6d-1dfa-4cb8-af03-f38e29b514c8"
 #define CHARACTERISTIC_UUID "04b2bcfc-1b74-4203-8b10-6d8e09b5be2b"
 
-#define TIME_TO_TRANSMIT 40000
+#define TIME_TO_TRANSMIT 60000
 #define TIME_TO_UPDATE 180000
 
 BLEDevice *myBLE;
@@ -133,6 +133,7 @@ void loop() {
       Serial.println("sleep mode");
       BLEinit(cmd);
       delay(30000);
+      esp_deep_sleep_start();
       break;
     default:
       Serial.println("deep sleep start");

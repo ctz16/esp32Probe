@@ -4,8 +4,8 @@
 #include <ESPmDNS.h>
 #include <Update.h>
 #include <esp_deep_sleep.h>
-#include <esp_spi_flash.h>
 #include <driver/adc.h>
+#include <driver/i2s.h>
 #include <BLEDevice.h>
 
 #define SERIAL_DEBUG 
@@ -13,10 +13,12 @@
 
 #define uS_TO_S_FACTOR 1000000ULL  /* Conversion factor for micro seconds to seconds */
 #define TIME_TO_SLEEP  60        /* Time ESP32 will go to sleep (in seconds) */
-#define DISCHARGE_LOOP_CNT 20000     /* total ADC samples */
+#define SAMPLE_NUM 20000     /* total ADC samples */
 #define WORKING_TIME 180000       /* OTA update working time (ms)*/
 #define INTERVAL_AFTER_DISCHARGE 2000          /* time (in ms) between adc end to transmit start */
 #define PAC_LEN 100               /* data count in each package */
+#define I2S_SAMPLE_RATE 100000
+#define ADC_INPUT ADC1_CHANNEL_0  /* pin SENSOR_VP */
 
 const char* host = "esp32";
 const char* ssid = "SUNIST-6";
@@ -40,7 +42,8 @@ static bool isDischarge = false;
 static bool isTransmit = false;
 static bool isUpGrade = false;
 
-uint16_t adcbuff[DISCHARGE_LOOP_CNT];
+uint16_t adc_reading[SAMPLE_NUM];
+
 uint16_t cnt = 0;
 long interval_to_discharge = 0;
 long transmit_start_time = 0;
@@ -287,13 +290,41 @@ void BLEinit(){
   doConnect = false;
 }
 
+/********** I2S **********/
+void i2sInit()
+{
+   i2s_config_t i2s_config = {
+    .mode = (i2s_mode_t)(I2S_MODE_MASTER | I2S_MODE_RX | I2S_MODE_ADC_BUILT_IN),
+    .sample_rate =  I2S_SAMPLE_RATE,              // The format of the signal using ADC_BUILT_IN
+    .bits_per_sample = I2S_BITS_PER_SAMPLE_16BIT, // is fixed at 12bit, stereo, MSB
+    .channel_format = I2S_CHANNEL_FMT_RIGHT_LEFT,
+    .communication_format = I2S_COMM_FORMAT_I2S_MSB,
+    .intr_alloc_flags = ESP_INTR_FLAG_LEVEL1,
+    .dma_buf_count = 2,
+    .dma_buf_len = 1000,
+    .use_apll = false,
+    .tx_desc_auto_clear = false,
+    .fixed_mclk = 0
+   };
+   adc1_config_channel_atten(ADC1_CHANNEL_0,ADC_ATTEN_DB_11);
+   adc1_config_width (ADC_WIDTH_12Bit);
+   i2s_driver_install(I2S_NUM_0, &i2s_config, 0, NULL);
+   i2s_set_adc_mode(ADC_UNIT_1, ADC_INPUT);
+}
+
+int adc_read(uint16_t* adc_value){
+  size_t num_bytes_read = 0;
+  i2s_read( I2S_NUM_0, (void*) adc_value,  SAMPLE_NUM * sizeof (uint16_t), &num_bytes_read, portMAX_DELAY);
+  return num_bytes_read;
+}
+
+
 /********** Control **********/
 
 void discharge(){
   pRemoteCharacteristic->writeValue("o");
   delay(50);
-  adc1_config_channel_atten(ADC1_CHANNEL_0,ADC_ATTEN_DB_0);
-  adc1_config_width(ADC_WIDTH_BIT_12);
+  i2sInit();
   if(notifyFlag){
     notifyFlag = false;
     #ifdef SERIAL_DEBUG
@@ -309,14 +340,17 @@ void discharge(){
   if(interval_to_discharge > 0){
     delay(interval_to_discharge);
   }
+  i2s_adc_enable(I2S_NUM_0);
   adc_start_time = millis();
-  for (int i = 0; i < DISCHARGE_LOOP_CNT; i++)
-  {
-    // we shall do the calculation outside
-    // adcbuff[i] = adc1_get_raw(ADC1_CHANNEL_0) / 4095 * 1.1;
-    adcbuff[i] = adc1_get_raw(ADC1_CHANNEL_0);
-  }
+  int num_read = adc_read(adc_reading);
+  // we shall do the calculation outside:
+  // adc_results[i] = 1.1* ( (float) (adc_reading[i]& 0x0FFF)) /0x0FFF;
   adc_end_time = millis();
+  i2s_adc_disable(I2S_NUM_0);
+  #ifdef SERIAL_DEBUG
+    Serial.print("num read: ");
+    Serial.println(num_read);
+  #endif
   delay(INTERVAL_AFTER_DISCHARGE);
   isDischarge = false;
   if(connected){
@@ -331,12 +365,12 @@ void transmitData(){
       String s = "";
       for (int i = 0; i < PAC_LEN; i++)
       {
-        s += adcbuff[PAC_LEN*cnt+i];
+        s += (adc_reading[PAC_LEN*cnt+i] & 0x0FFF);
         s += ",";
       }
       cnt++;
       pRemoteCharacteristic->writeValue(s.c_str());
-      if(cnt == DISCHARGE_LOOP_CNT / PAC_LEN){
+      if(cnt == SAMPLE_NUM / PAC_LEN){
         delay(50);
         char tbuff[10];
         itoa(adc_end_time-adc_start_time,tbuff,10);
@@ -388,6 +422,12 @@ void setup(void) {
     Serial.println("BLE begin");
   #endif
   BLEinit();
+  uint32_t freq = ledcSetup(0, 100, 8); //channel, freq, resolution
+  #ifdef SERIAL_DEBUG
+    Serial.printf("Output frequency: %d\n", freq);
+  #endif
+  ledcWrite(0, 100); //channel, duty
+  ledcAttachPin(27, 0); //pin, channel
   sys_start_time = millis();
 }
 
