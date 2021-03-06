@@ -23,20 +23,24 @@ stime = 20000 # time to discharge in ms
 cmd = ""
 num_samples = 20000
 num_lines = 200
-ADvalue = []
 datafile = "data.txt"
 
 def plotVal(filename):
-    with open("data.txt",'r') as f:
+    ADvalue = []
+    with open(filename,'r') as f:
         for i in range(num_lines):
             for x in f.readline().split(','):
                 if x != '\n':
                     ADvalue.append(int(x))
         time = int(f.readline())
+    ADvalue = np.array(ADvalue)
+    zeroCross = np.where(np.diff(np.sign(ADvalue-2048)))[0].shape[-1]
+    freq = zeroCross / 2 / time * 1000
+    print('freq: ', freq)
     plt.plot(np.linspace(0,time,num_samples),ADvalue)
     plt.xlabel("time[ms]")
     plt.ylabel("AD_val")
-    plt.grid()
+    plt.grid(linewidth=0.5)
     plt.show()
 
 def reset(ser):
@@ -44,7 +48,7 @@ def reset(ser):
     time.sleep(0.01)
     GPIO.output(spin,GPIO.HIGH)
     time.sleep(0.01)
-    for i in range(15): #gap 15 lines ROM boot log
+    for i in range(15): # gap 15 lines ROM boot log
         s = ser.readline().decode()
     print(s)
 
@@ -55,7 +59,6 @@ def writedata(ser,filename,seconds):
             s = ser.readline().decode()
             f.write(s)
     
-
 def monitor(ser,seconds):
     tic = time.time()
     while time.time()-tic < seconds:
@@ -67,6 +70,7 @@ def monitor(ser,seconds):
             elif s[0] == 'x':
                 writedata(ser,datafile,10)
                 print("data recieved")
+                break
     
 def main():
     ser = serial.Serial("/dev/ttyS0",baudrate = 115200, parity = serial.PARITY_NONE,stopbits=serial.STOPBITS_ONE,bytesize=serial.EIGHTBITS,timeout=1)
@@ -88,6 +92,7 @@ def main():
     monitor(ser,1)
 
     plotVal(datafile)
-    
+
+
 if __name__ == "__main__":
     main()        

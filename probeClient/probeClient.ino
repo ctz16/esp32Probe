@@ -17,7 +17,7 @@
 #define WORKING_TIME 180000       /* OTA update working time (ms)*/
 #define INTERVAL_AFTER_DISCHARGE 2000          /* time (in ms) between adc end to transmit start */
 #define PAC_LEN 100               /* data count in each package */
-#define I2S_SAMPLE_RATE 100000
+#define I2S_SAMPLE_RATE 500000
 #define ADC_INPUT ADC1_CHANNEL_0  /* pin SENSOR_VP */
 
 const char* host = "esp32";
@@ -297,11 +297,11 @@ void i2sInit()
     .mode = (i2s_mode_t)(I2S_MODE_MASTER | I2S_MODE_RX | I2S_MODE_ADC_BUILT_IN),
     .sample_rate =  I2S_SAMPLE_RATE,              // The format of the signal using ADC_BUILT_IN
     .bits_per_sample = I2S_BITS_PER_SAMPLE_16BIT, // is fixed at 12bit, stereo, MSB
-    .channel_format = I2S_CHANNEL_FMT_RIGHT_LEFT,
+    .channel_format = I2S_CHANNEL_FMT_ONLY_LEFT,
     .communication_format = I2S_COMM_FORMAT_I2S_MSB,
     .intr_alloc_flags = ESP_INTR_FLAG_LEVEL1,
-    .dma_buf_count = 2,
-    .dma_buf_len = 1000,
+    .dma_buf_count = 4,
+    .dma_buf_len = 8,
     .use_apll = false,
     .tx_desc_auto_clear = false,
     .fixed_mclk = 0
@@ -422,7 +422,7 @@ void setup(void) {
     Serial.println("BLE begin");
   #endif
   BLEinit();
-  uint32_t freq = ledcSetup(0, 100, 8); //channel, freq, resolution
+  uint32_t freq = ledcSetup(0, 5000, 8); //channel, freq, resolution
   #ifdef SERIAL_DEBUG
     Serial.printf("Output frequency: %d\n", freq);
   #endif

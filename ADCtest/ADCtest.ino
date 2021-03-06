@@ -65,7 +65,7 @@ void i2sInit()
     .mode = (i2s_mode_t)(I2S_MODE_MASTER | I2S_MODE_RX | I2S_MODE_ADC_BUILT_IN),
     .sample_rate =  I2S_SAMPLE_RATE,              // The format of the signal using ADC_BUILT_IN
     .bits_per_sample = I2S_BITS_PER_SAMPLE_16BIT, // is fixed at 12bit, stereo, MSB
-    .channel_format = I2S_CHANNEL_FMT_RIGHT_LEFT,
+    .channel_format = I2S_CHANNEL_FMT_ALL_LEFT,
     .communication_format = I2S_COMM_FORMAT_I2S_MSB,
     .intr_alloc_flags = ESP_INTR_FLAG_LEVEL1,
     .dma_buf_count = 4,
@@ -102,13 +102,13 @@ void loop() {
   int num_read = adc_read(adc_reading);
   adc_end_time = millis();
   i2s_adc_disable(I2S_NUM_0);
-  Serial.print("adc cost: ");
+  Serial.print("total time cost: ");
   Serial.println(adc_end_time-adc_start_time);
   Serial.print("number read: ");
   Serial.println(num_read);
   for (int i = 0; i < SAMPLE_NUM/1000; i++)
   {
-    adc_results[i] = 3.96* ( (float) (adc_reading[1000*i]& 0x0FFF)) /0x0FFF;
+    adc_results[i] = 2.45* ( (float) (adc_reading[1000*i]& 0x0FFF)) /0x0FFF;
     Serial.println(adc_results[i]);
   }
   delay(10000);
