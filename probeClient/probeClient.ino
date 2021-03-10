@@ -301,7 +301,7 @@ void i2sInit()
     .communication_format = I2S_COMM_FORMAT_I2S_MSB,
     .intr_alloc_flags = ESP_INTR_FLAG_LEVEL1,
     .dma_buf_count = 4,
-    .dma_buf_len = 8,
+    .dma_buf_len = 1024,
     .use_apll = false,
     .tx_desc_auto_clear = false,
     .fixed_mclk = 0
@@ -324,7 +324,7 @@ int adc_read(uint16_t* adc_value){
 void discharge(){
   pRemoteCharacteristic->writeValue("o");
   delay(50);
-  i2sInit();
+//  i2sInit();
   if(notifyFlag){
     notifyFlag = false;
     #ifdef SERIAL_DEBUG
@@ -340,17 +340,20 @@ void discharge(){
   if(interval_to_discharge > 0){
     delay(interval_to_discharge);
   }
-  i2s_adc_enable(I2S_NUM_0);
+//  i2s_adc_enable(I2S_NUM_0);
   adc_start_time = millis();
-  int num_read = adc_read(adc_reading);
+//  int num_read = adc_read(adc_reading);
+  for (int i = 0; i < SAMPLE_NUM; i++){
+    adc_reading[i] = analogRead(36);
+  }
   // we shall do the calculation outside:
   // adc_results[i] = 1.1* ( (float) (adc_reading[i]& 0x0FFF)) /0x0FFF;
   adc_end_time = millis();
-  i2s_adc_disable(I2S_NUM_0);
-  #ifdef SERIAL_DEBUG
-    Serial.print("num read: ");
-    Serial.println(num_read);
-  #endif
+//  i2s_adc_disable(I2S_NUM_0);
+//  #ifdef SERIAL_DEBUG
+//    Serial.print("num read: ");
+//    Serial.println(num_read);
+//  #endif
   delay(INTERVAL_AFTER_DISCHARGE);
   isDischarge = false;
   if(connected){
@@ -422,7 +425,7 @@ void setup(void) {
     Serial.println("BLE begin");
   #endif
   BLEinit();
-  uint32_t freq = ledcSetup(0, 5000, 8); //channel, freq, resolution
+  uint32_t freq = ledcSetup(0, 10000, 8); //channel, freq, resolution
   #ifdef SERIAL_DEBUG
     Serial.printf("Output frequency: %d\n", freq);
   #endif
