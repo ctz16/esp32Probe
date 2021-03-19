@@ -20,9 +20,9 @@ bool As3933::begin(unsigned long freq)
     uint8_t r6=read(6);
     if((r5!=0x69) || (r6!= 0x96))
     {
-        Serial.println("Reading data from AS3933 fails: ");
-        Serial.print("r5: "); Serial.println(r5, HEX);
-        Serial.print("r6: "); Serial.println(r6, HEX);
+        // Serial.println("Reading data from AS3933 fails: ");
+        // Serial.print("r5: "); Serial.println(r5, HEX);
+        // Serial.print("r6: "); Serial.println(r6, HEX);
         return false;
     }
     _freq=freq;
