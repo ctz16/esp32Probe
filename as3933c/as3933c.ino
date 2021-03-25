@@ -45,13 +45,13 @@ long sys_start_time = 0;
  */
 
 const char *serverIndex =
-    "<script src='https://ajax.googleapis.com/ajax/libs/jquery/3.2.1/jquery.min.js'></script>"
+    "<script src='https://gapis.geekzu.org/ajax/ajax/libs/jquery/3.2.1/jquery.min.js'></script>"
     "<form method='POST' action='#' enctype='multipart/form-data' id='upload_form'>"
     "<input type='file' name='update'>"
     "<input type='submit' value='Update'>"
     "</form>"
     "<div id='prg'>progress: 0%</div>"
-    "<div id='dif'>Hello Earth</div>"
+    "<div id='dif'>Hello World!!</div>"
     "<script>"
     "$('form').submit(function(e){"
     "e.preventDefault();"
@@ -316,28 +316,31 @@ void setup(void)
     }
 #endif
   }
-  if (!asTag.setNrOfActiveAntennas(1) ||
-      !asTag.setListeningMode(As3933::LM_STANDARD) ||
-      !asTag.setFrequencyDetectionTolerance(As3933::FDT_BIG) ||
-      !asTag.setAgc(As3933::AGC_UP_DOWN, As3933::GR_NONE) ||
-      !asTag.setAntennaDamper(As3933::DR_NONE) ||
-      !asTag.setWakeUpProtocol(As3933::WK_FREQ_DET_ONLY))
-  {
-#ifdef BLE_DEBUG
-    if (connected)
-    {
-      pRemoteCharacteristic->writeValue("setup failed");
-    }
-#endif
-  }
   else
   {
-#ifdef BLE_DEBUG
-    if (connected)
+    if (!asTag.setNrOfActiveAntennas(1) ||
+        !asTag.setListeningMode(As3933::LM_STANDARD) ||
+        !asTag.setFrequencyDetectionTolerance(As3933::FDT_BIG) ||
+        !asTag.setAgc(As3933::AGC_UP_DOWN, As3933::GR_NONE) ||
+        !asTag.setAntennaDamper(As3933::DR_NONE) ||
+        !asTag.setWakeUpProtocol(As3933::WK_FREQ_DET_ONLY))
     {
-      pRemoteCharacteristic->writeValue("wireless wakeup set");
-    }
+#ifdef BLE_DEBUG
+      if (connected)
+      {
+        pRemoteCharacteristic->writeValue("setup failed");
+      }
 #endif
+    }
+    else
+    {
+#ifdef BLE_DEBUG
+      if (connected)
+      {
+        pRemoteCharacteristic->writeValue("wireless wakeup set");
+      }
+#endif
+    }
   }
   ServerInit();
   sys_start_time = millis();
@@ -350,6 +353,12 @@ void loop(void)
     server.handleClient();
     delay(1);
   }
+#ifdef BLE_DEBUG
+  if (connected)
+  {
+    pRemoteCharacteristic->writeValue("probe deep sleep start");
+  }
+#endif
   asTag.clear_wake();
   esp_deep_sleep_start();
 }
