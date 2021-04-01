@@ -4,9 +4,12 @@
 #include <ESPmDNS.h>
 #include <Update.h>
 #include <esp_deep_sleep.h>
+#include <driver/rtc_io.h>
 #include <driver/adc.h>
 #include <driver/i2s.h>
 #include <BLEDevice.h>
+#include "SPI.h"
+#include "bma400.h"
 
 #define SERIAL_DEBUG 
 #define BLE_DEBUG
@@ -19,6 +22,10 @@
 #define PAC_LEN 100               /* data count in each package */
 #define I2S_SAMPLE_RATE 500000
 #define ADC_INPUT ADC1_CHANNEL_0  /* pin SENSOR_VP */
+
+RTC_DATA_ATTR int bootCount = 0;
+SPIClass* hspi = new SPIClass(HSPI);
+BMA400 bma400(hspi);
 
 const char* host = "esp32";
 const char* ssid = "SUNIST-6";
@@ -58,13 +65,13 @@ long sys_start_time = 0;
  */
  
 const char* serverIndex = 
-"<script src='https://ajax.googleapis.com/ajax/libs/jquery/3.2.1/jquery.min.js'></script>"
+"<script src='https://gapis.geekzu.org/ajax/ajax/libs/jquery/3.2.1/jquery.min.js'></script>"
 "<form method='POST' action='#' enctype='multipart/form-data' id='upload_form'>"
    "<input type='file' name='update'>"
         "<input type='submit' value='Update'>"
     "</form>"
  "<div id='prg'>progress: 0%</div>"
- "<div id='dif'>Hello Mars</div>"
+ "<div id='dif'>Hello Mars!</div>"
  "<script>"
   "$('form').submit(function(e){"
   "e.preventDefault();"
@@ -122,10 +129,6 @@ void ServerInit(){
   }
   /*return index page which is stored in serverIndex */
   server.on("/", HTTP_GET, []() {
-    server.sendHeader("Connection", "close");
-    server.send(200, "text/html", serverIndex);
-  });
-  server.on("/serverIndex", HTTP_GET, []() {
     server.sendHeader("Connection", "close");
     server.send(200, "text/html", serverIndex);
   });
@@ -325,6 +328,8 @@ void discharge(){
   pRemoteCharacteristic->writeValue("o");
   delay(50);
 //  i2sInit();
+	adc1_config_channel_atten(ADC1_CHANNEL_0,ADC_ATTEN_DB_11);
+	adc1_config_width (ADC_WIDTH_12Bit);
   if(notifyFlag){
     notifyFlag = false;
     #ifdef SERIAL_DEBUG
@@ -344,7 +349,8 @@ void discharge(){
   adc_start_time = millis();
 //  int num_read = adc_read(adc_reading);
   for (int i = 0; i < SAMPLE_NUM; i++){
-    adc_reading[i] = analogRead(36);
+//    adc_reading[i] = analogRead(36);
+    adc_reading[i] = adc1_get_raw(ADC1_CHANNEL_0);
   }
   // we shall do the calculation outside:
   // adc_results[i] = 1.1* ( (float) (adc_reading[i]& 0x0FFF)) /0x0FFF;
@@ -418,16 +424,40 @@ void upGrade(){
 }
 
 void setup(void) {
-  esp_sleep_enable_timer_wakeup(TIME_TO_SLEEP * uS_TO_S_FACTOR);
-  esp_deep_sleep_pd_config(ESP_PD_DOMAIN_RTC_PERIPH, ESP_PD_OPTION_OFF);
   #ifdef SERIAL_DEBUG
     Serial.begin(115200);
     Serial.println("BLE begin");
+    Serial.println("Boot number: " + String(bootCount));
   #endif
+  ++bootCount;
+  hspi->begin();
+  pinMode(HSPICS0, OUTPUT);
+  digitalWrite(HSPICS0,LOW);
+  delay(10);
+  digitalWrite(HSPICS0,HIGH);
+  delay(10);
+  esp_deep_sleep_pd_config(ESP_PD_DOMAIN_RTC_PERIPH, ESP_PD_OPTION_ON);
+  rtc_gpio_isolate(GPIO_NUM_12);
+  esp_sleep_enable_ext0_wakeup(GPIO_NUM_33,0);
   BLEinit();
   uint32_t freq = ledcSetup(0, 10000, 8); //channel, freq, resolution
   #ifdef SERIAL_DEBUG
     Serial.printf("Output frequency: %d\n", freq);
+  #endif
+  if (bma400.isConnection())
+  {
+      bma400.initialize();
+      bma400.enable_shake_interrupt();
+      #ifdef SERIAL_DEBUG
+        Serial.println("BMA400 is ready");
+      #endif
+  }
+  #ifdef SERIAL_DEBUG
+  else
+  {
+      Serial.println("BMA400 is not connected");
+      delay(3000);
+  }
   #endif
   ledcWrite(0, 100); //channel, duty
   ledcAttachPin(27, 0); //pin, channel

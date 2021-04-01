@@ -1,4 +1,6 @@
 #include <driver/adc.h>
+#define SAMPLES 10000
+uint16_t val[SAMPLES];
 
 void setup() {
   Serial.begin(115200);
@@ -9,9 +11,6 @@ void setup() {
   ledcWrite(0, 100);
   ledcAttachPin(27, 0);
 }
-
-#define SAMPLES 10000
-uint16_t val[SAMPLES];
 
 void loop() {
   long adc_start_time = millis();
