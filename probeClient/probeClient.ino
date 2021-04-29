@@ -6,7 +6,7 @@
 #include <esp_deep_sleep.h>
 #include <driver/rtc_io.h>
 #include <driver/adc.h>
-#include <driver/i2s.h>
+//#include <driver/i2s.h>
 #include <BLEDevice.h>
 #include "SPI.h"
 #include "bma400.h"
@@ -15,12 +15,12 @@
 #define BLE_DEBUG
 
 #define uS_TO_S_FACTOR 1000000ULL  /* Conversion factor for micro seconds to seconds */
-#define TIME_TO_SLEEP  60        /* Time ESP32 will go to sleep (in seconds) */
+// #define TIME_TO_SLEEP  60        /* Time ESP32 will go to sleep (in seconds, timer wakeup) */
 #define SAMPLE_NUM 20000     /* total ADC samples */
 #define WORKING_TIME 180000       /* OTA update working time (ms)*/
-#define INTERVAL_AFTER_DISCHARGE 2000          /* time (in ms) between adc end to transmit start */
+#define INTERVAL_AFTER_DISCHARGE 1000          /* time (in ms) between adc end to transmit start */
 #define PAC_LEN 100               /* data count in each package */
-#define I2S_SAMPLE_RATE 500000
+// #define I2S_SAMPLE_RATE 500000
 #define ADC_INPUT ADC1_CHANNEL_0  /* pin SENSOR_VP */
 
 RTC_DATA_ATTR int bootCount = 0;
@@ -71,7 +71,7 @@ const char* serverIndex =
         "<input type='submit' value='Update'>"
     "</form>"
  "<div id='prg'>progress: 0%</div>"
- "<div id='dif'>Hello Mars!</div>"
+ "<div id='dif'>Hello Mars!!</div>"
  "<script>"
   "$('form').submit(function(e){"
   "e.preventDefault();"
@@ -294,32 +294,32 @@ void BLEinit(){
 }
 
 /********** I2S **********/
-void i2sInit()
-{
-   i2s_config_t i2s_config = {
-    .mode = (i2s_mode_t)(I2S_MODE_MASTER | I2S_MODE_RX | I2S_MODE_ADC_BUILT_IN),
-    .sample_rate =  I2S_SAMPLE_RATE,              // The format of the signal using ADC_BUILT_IN
-    .bits_per_sample = I2S_BITS_PER_SAMPLE_16BIT, // is fixed at 12bit, stereo, MSB
-    .channel_format = I2S_CHANNEL_FMT_ONLY_LEFT,
-    .communication_format = I2S_COMM_FORMAT_I2S_MSB,
-    .intr_alloc_flags = ESP_INTR_FLAG_LEVEL1,
-    .dma_buf_count = 4,
-    .dma_buf_len = 1024,
-    .use_apll = false,
-    .tx_desc_auto_clear = false,
-    .fixed_mclk = 0
-   };
-   adc1_config_channel_atten(ADC1_CHANNEL_0,ADC_ATTEN_DB_11);
-   adc1_config_width (ADC_WIDTH_12Bit);
-   i2s_driver_install(I2S_NUM_0, &i2s_config, 0, NULL);
-   i2s_set_adc_mode(ADC_UNIT_1, ADC_INPUT);
-}
-
-int adc_read(uint16_t* adc_value){
-  size_t num_bytes_read = 0;
-  i2s_read( I2S_NUM_0, (void*) adc_value,  SAMPLE_NUM * sizeof (uint16_t), &num_bytes_read, portMAX_DELAY);
-  return num_bytes_read;
-}
+//void i2sInit()
+//{
+//   i2s_config_t i2s_config = {
+//    .mode = (i2s_mode_t)(I2S_MODE_MASTER | I2S_MODE_RX | I2S_MODE_ADC_BUILT_IN),
+//    .sample_rate =  I2S_SAMPLE_RATE,              // The format of the signal using ADC_BUILT_IN
+//    .bits_per_sample = I2S_BITS_PER_SAMPLE_16BIT, // is fixed at 12bit, stereo, MSB
+//    .channel_format = I2S_CHANNEL_FMT_ONLY_LEFT,
+//    .communication_format = I2S_COMM_FORMAT_I2S_MSB,
+//    .intr_alloc_flags = ESP_INTR_FLAG_LEVEL1,
+//    .dma_buf_count = 4,
+//    .dma_buf_len = 1024,
+//    .use_apll = false,
+//    .tx_desc_auto_clear = false,
+//    .fixed_mclk = 0
+//   };
+//   adc1_config_channel_atten(ADC1_CHANNEL_0,ADC_ATTEN_DB_11);
+//   adc1_config_width (ADC_WIDTH_12Bit);
+//   i2s_driver_install(I2S_NUM_0, &i2s_config, 0, NULL);
+//   i2s_set_adc_mode(ADC_UNIT_1, ADC_INPUT);
+//}
+//
+//int adc_read(uint16_t* adc_value){
+//  size_t num_bytes_read = 0;
+//  i2s_read( I2S_NUM_0, (void*) adc_value,  SAMPLE_NUM * sizeof (uint16_t), &num_bytes_read, portMAX_DELAY);
+//  return num_bytes_read;
+//}
 
 
 /********** Control **********/
@@ -330,6 +330,9 @@ void discharge(){
 //  i2sInit();
 	adc1_config_channel_atten(ADC1_CHANNEL_0,ADC_ATTEN_DB_11);
 	adc1_config_width (ADC_WIDTH_12Bit);
+  for (int i = 0; i < SAMPLE_NUM/10; i++){
+    adc_reading[i] = analogRead(36);
+  }
   if(notifyFlag){
     notifyFlag = false;
     #ifdef SERIAL_DEBUG
@@ -346,15 +349,18 @@ void discharge(){
     delay(interval_to_discharge);
   }
 //  i2s_adc_enable(I2S_NUM_0);
+  adc_reading[0] = adc1_get_raw(ADC1_CHANNEL_0);
+//  portDISABLE_INTERRUPTS();
   adc_start_time = millis();
 //  int num_read = adc_read(adc_reading);
   for (int i = 0; i < SAMPLE_NUM; i++){
-//    adc_reading[i] = analogRead(36);
-    adc_reading[i] = adc1_get_raw(ADC1_CHANNEL_0);
+    adc_reading[i] = analogRead(36);
+//    adc_reading[i] = adc1_get_raw(ADC1_CHANNEL_0);
   }
   // we shall do the calculation outside:
   // adc_results[i] = 1.1* ( (float) (adc_reading[i]& 0x0FFF)) /0x0FFF;
   adc_end_time = millis();
+//  portENABLE_INTERRUPTS();
 //  i2s_adc_disable(I2S_NUM_0);
 //  #ifdef SERIAL_DEBUG
 //    Serial.print("num read: ");
@@ -436,14 +442,13 @@ void setup(void) {
   delay(10);
   digitalWrite(HSPICS0,HIGH);
   delay(10);
-  esp_deep_sleep_pd_config(ESP_PD_DOMAIN_RTC_PERIPH, ESP_PD_OPTION_ON);
-  rtc_gpio_isolate(GPIO_NUM_12);
-  esp_sleep_enable_ext0_wakeup(GPIO_NUM_33,0);
   BLEinit();
-  uint32_t freq = ledcSetup(0, 10000, 8); //channel, freq, resolution
-  #ifdef SERIAL_DEBUG
-    Serial.printf("Output frequency: %d\n", freq);
-  #endif
+  // uint32_t freq = ledcSetup(0, 10000, 8); //channel, freq, resolution
+  // #ifdef SERIAL_DEBUG
+  //   Serial.printf("Output frequency: %d\n", freq);
+  // #endif
+  // ledcWrite(0, 100); //channel, duty
+  // ledcAttachPin(27, 0); //pin, channel
   if (bma400.isConnection())
   {
       bma400.initialize();
@@ -459,8 +464,6 @@ void setup(void) {
       delay(3000);
   }
   #endif
-  ledcWrite(0, 100); //channel, duty
-  ledcAttachPin(27, 0); //pin, channel
   sys_start_time = millis();
 }
 
@@ -482,9 +485,11 @@ void loop(void) {
   }
   else{
     #ifdef SERIAL_DEBUG
-      Serial.print("deep sleep start, wait for seconds: ");
-      Serial.println(TIME_TO_SLEEP);
+      Serial.print("deep sleep start, shake to wakeup ");
     #endif
+//    esp_deep_sleep_pd_config(ESP_PD_DOMAIN_RTC_PERIPH, ESP_PD_OPTION_ON);
+    esp_sleep_enable_ext0_wakeup(GPIO_NUM_34,0);
+    rtc_gpio_isolate(GPIO_NUM_12);
     esp_deep_sleep_start();
   }
 }
