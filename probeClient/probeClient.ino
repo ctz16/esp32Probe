@@ -6,12 +6,11 @@
 #include <esp_deep_sleep.h>
 #include <driver/rtc_io.h>
 #include <driver/adc.h>
-//#include <driver/i2s.h>
 #include <BLEDevice.h>
 #include "SPI.h"
 #include "bma400.h"
 
-#define SERIAL_DEBUG 
+//#define SERIAL_DEBUG 
 #define BLE_DEBUG
 
 #define uS_TO_S_FACTOR 1000000ULL  /* Conversion factor for micro seconds to seconds */
@@ -71,7 +70,7 @@ const char* serverIndex =
         "<input type='submit' value='Update'>"
     "</form>"
  "<div id='prg'>progress: 0%</div>"
- "<div id='dif'>Hello Mars!!</div>"
+ "<div id='dif'>Hello Mars!!!</div>"
  "<script>"
   "$('form').submit(function(e){"
   "e.preventDefault();"
@@ -293,35 +292,6 @@ void BLEinit(){
   doConnect = false;
 }
 
-/********** I2S **********/
-//void i2sInit()
-//{
-//   i2s_config_t i2s_config = {
-//    .mode = (i2s_mode_t)(I2S_MODE_MASTER | I2S_MODE_RX | I2S_MODE_ADC_BUILT_IN),
-//    .sample_rate =  I2S_SAMPLE_RATE,              // The format of the signal using ADC_BUILT_IN
-//    .bits_per_sample = I2S_BITS_PER_SAMPLE_16BIT, // is fixed at 12bit, stereo, MSB
-//    .channel_format = I2S_CHANNEL_FMT_ONLY_LEFT,
-//    .communication_format = I2S_COMM_FORMAT_I2S_MSB,
-//    .intr_alloc_flags = ESP_INTR_FLAG_LEVEL1,
-//    .dma_buf_count = 4,
-//    .dma_buf_len = 1024,
-//    .use_apll = false,
-//    .tx_desc_auto_clear = false,
-//    .fixed_mclk = 0
-//   };
-//   adc1_config_channel_atten(ADC1_CHANNEL_0,ADC_ATTEN_DB_11);
-//   adc1_config_width (ADC_WIDTH_12Bit);
-//   i2s_driver_install(I2S_NUM_0, &i2s_config, 0, NULL);
-//   i2s_set_adc_mode(ADC_UNIT_1, ADC_INPUT);
-//}
-//
-//int adc_read(uint16_t* adc_value){
-//  size_t num_bytes_read = 0;
-//  i2s_read( I2S_NUM_0, (void*) adc_value,  SAMPLE_NUM * sizeof (uint16_t), &num_bytes_read, portMAX_DELAY);
-//  return num_bytes_read;
-//}
-
-
 /********** Control **********/
 
 void discharge(){
@@ -333,6 +303,7 @@ void discharge(){
   for (int i = 0; i < SAMPLE_NUM/10; i++){
     adc_reading[i] = analogRead(36);
   }
+  unsigned long t = 0;
   if(notifyFlag){
     notifyFlag = false;
     #ifdef SERIAL_DEBUG
@@ -340,37 +311,40 @@ void discharge(){
     #endif
     String value = pRemoteCharacteristic->readValue().c_str();
     interval_to_discharge = value.toInt();
+    t = millis();
   }
   #ifdef SERIAL_DEBUG
     Serial.print("time to start: ");
     Serial.println(interval_to_discharge);
   #endif
-  if(interval_to_discharge > 0){
-    delay(interval_to_discharge);
+  pClient->disconnect();
+  BLEDevice::deinit();
+  long time_to_start = interval_to_discharge - (millis()-t);
+  if(time_to_start > 0){
+    delay(time_to_start);
   }
-//  i2s_adc_enable(I2S_NUM_0);
   adc_reading[0] = adc1_get_raw(ADC1_CHANNEL_0);
 //  portDISABLE_INTERRUPTS();
   adc_start_time = millis();
-//  int num_read = adc_read(adc_reading);
   for (int i = 0; i < SAMPLE_NUM; i++){
-    adc_reading[i] = analogRead(36);
+    adc_reading[i] = analogRead(36);  //sensor vp
 //    adc_reading[i] = adc1_get_raw(ADC1_CHANNEL_0);
   }
   // we shall do the calculation outside:
   // adc_results[i] = 1.1* ( (float) (adc_reading[i]& 0x0FFF)) /0x0FFF;
   adc_end_time = millis();
 //  portENABLE_INTERRUPTS();
-//  i2s_adc_disable(I2S_NUM_0);
-//  #ifdef SERIAL_DEBUG
-//    Serial.print("num read: ");
-//    Serial.println(num_read);
-//  #endif
   delay(INTERVAL_AFTER_DISCHARGE);
   isDischarge = false;
+  BLEinit();
   if(connected){
     isTransmit = true;
   }
+  #ifdef SERIAL_DEBUG
+  else{
+    Serial.println("BLE reconnect failed");
+  }
+  #endif
 }
 
 void transmitData(){
@@ -436,34 +410,12 @@ void setup(void) {
     Serial.println("Boot number: " + String(bootCount));
   #endif
   ++bootCount;
-  hspi->begin();
   pinMode(HSPICS0, OUTPUT);
   digitalWrite(HSPICS0,LOW);
   delay(10);
   digitalWrite(HSPICS0,HIGH);
   delay(10);
   BLEinit();
-  // uint32_t freq = ledcSetup(0, 10000, 8); //channel, freq, resolution
-  // #ifdef SERIAL_DEBUG
-  //   Serial.printf("Output frequency: %d\n", freq);
-  // #endif
-  // ledcWrite(0, 100); //channel, duty
-  // ledcAttachPin(27, 0); //pin, channel
-  if (bma400.isConnection())
-  {
-      bma400.initialize();
-      bma400.enable_shake_interrupt();
-      #ifdef SERIAL_DEBUG
-        Serial.println("BMA400 is ready");
-      #endif
-  }
-  #ifdef SERIAL_DEBUG
-  else
-  {
-      Serial.println("BMA400 is not connected");
-      delay(3000);
-  }
-  #endif
   sys_start_time = millis();
 }
 
@@ -484,6 +436,22 @@ void loop(void) {
     upGrade();
   }
   else{
+    hspi->begin();
+    if (bma400.isConnection())
+    {
+        bma400.initialize();
+        bma400.enable_shake_interrupt();
+        #ifdef SERIAL_DEBUG
+          Serial.println("BMA400 is ready");
+        #endif
+    }
+    #ifdef SERIAL_DEBUG
+    else
+    {
+        Serial.println("BMA400 is not connected");
+        delay(3000);
+    }
+    #endif
     #ifdef SERIAL_DEBUG
       Serial.print("deep sleep start, shake to wakeup ");
     #endif
