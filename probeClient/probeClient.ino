@@ -10,7 +10,7 @@
 #include "SPI.h"
 #include "bma400.h"
 
-//#define SERIAL_DEBUG 
+#define SERIAL_DEBUG 
 #define BLE_DEBUG
 
 #define uS_TO_S_FACTOR 1000000ULL  /* Conversion factor for micro seconds to seconds */
@@ -23,11 +23,10 @@
 #define ADC_INPUT ADC1_CHANNEL_0  /* pin SENSOR_VP */
 
 RTC_DATA_ATTR int bootCount = 0;
-SPIClass* hspi = new SPIClass(HSPI);
-BMA400 bma400(hspi);
 
 const char* host = "esp32";
 const char* ssid = "SUNIST-6";
+// const char* ssid = "SUNIST-AP";
 const char* password = "sunist1234";
 
 WebServer server(80);
@@ -56,6 +55,9 @@ long transmit_start_time = 0;
 long adc_start_time = 0;
 long adc_end_time = 0;
 long sys_start_time = 0;
+
+SPIClass* hspi = new SPIClass(HSPI);
+BMA400 bma400(hspi);
 
 /********** Web Server **********/
 
@@ -300,9 +302,9 @@ void discharge(){
 //  i2sInit();
 	adc1_config_channel_atten(ADC1_CHANNEL_0,ADC_ATTEN_DB_11);
 	adc1_config_width (ADC_WIDTH_12Bit);
-  for (int i = 0; i < SAMPLE_NUM/10; i++){
-    adc_reading[i] = analogRead(36);
-  }
+//  for (int i = 0; i < SAMPLE_NUM/10; i++){
+//    adc_reading[i] = analogRead(36);
+//  }
   unsigned long t = 0;
   if(notifyFlag){
     notifyFlag = false;
@@ -327,8 +329,8 @@ void discharge(){
 //  portDISABLE_INTERRUPTS();
   adc_start_time = millis();
   for (int i = 0; i < SAMPLE_NUM; i++){
-    adc_reading[i] = analogRead(36);  //sensor vp
-//    adc_reading[i] = adc1_get_raw(ADC1_CHANNEL_0);
+//    adc_reading[i] = analogRead(36);  //sensor vp
+    adc_reading[i] = adc1_get_raw(ADC1_CHANNEL_0);
   }
   // we shall do the calculation outside:
   // adc_results[i] = 1.1* ( (float) (adc_reading[i]& 0x0FFF)) /0x0FFF;
@@ -396,11 +398,45 @@ void transmitData(){
 
 void upGrade(){
   isUpGrade = false;
+  sys_start_time = millis();
   ServerInit();
   while (millis()-sys_start_time < WORKING_TIME){
     server.handleClient();
     delay(1);
   }
+}
+
+void deepSleep(){
+  pinMode(HSPICS0, OUTPUT);
+  digitalWrite(HSPICS0,LOW);
+  delay(10);
+  digitalWrite(HSPICS0,HIGH);
+  delay(10);
+  hspi->begin();
+  if (bma400.isConnection())
+  {
+      bma400.initialize();
+      bma400.enable_shake_interrupt();
+      #ifdef SERIAL_DEBUG
+        Serial.println("BMA400 is ready");
+      #endif
+  }
+  #ifdef SERIAL_DEBUG
+  else
+  {
+      Serial.println("BMA400 is not connected");
+      delay(3000);
+  }
+  #endif
+  #ifdef SERIAL_DEBUG
+    Serial.print("deep sleep start, shake to wakeup ");
+  #endif
+  hspi->end();
+  delay(500);
+//    esp_deep_sleep_pd_config(ESP_PD_DOMAIN_RTC_PERIPH, ESP_PD_OPTION_ON);
+  esp_sleep_enable_ext0_wakeup(GPIO_NUM_34,0);
+  rtc_gpio_isolate(GPIO_NUM_12);
+  esp_deep_sleep_start();
 }
 
 void setup(void) {
@@ -410,13 +446,29 @@ void setup(void) {
     Serial.println("Boot number: " + String(bootCount));
   #endif
   ++bootCount;
+  BLEinit();
   pinMode(HSPICS0, OUTPUT);
   digitalWrite(HSPICS0,LOW);
   delay(10);
   digitalWrite(HSPICS0,HIGH);
   delay(10);
-  BLEinit();
-  sys_start_time = millis();
+  hspi->begin();
+  if (bma400.isConnection())
+  {
+      if (bma400.setPoweMode(SLEEP)){
+      #ifdef SERIAL_DEBUG
+        Serial.println("BMA400 sleeps");
+      #endif
+      }
+  }
+  #ifdef SERIAL_DEBUG
+  else
+  {
+      Serial.println("BMA400 is not connected");
+      delay(3000);
+  }
+  #endif
+  hspi->end();
 }
 
 void loop(void) {
@@ -436,28 +488,6 @@ void loop(void) {
     upGrade();
   }
   else{
-    hspi->begin();
-    if (bma400.isConnection())
-    {
-        bma400.initialize();
-        bma400.enable_shake_interrupt();
-        #ifdef SERIAL_DEBUG
-          Serial.println("BMA400 is ready");
-        #endif
-    }
-    #ifdef SERIAL_DEBUG
-    else
-    {
-        Serial.println("BMA400 is not connected");
-        delay(3000);
-    }
-    #endif
-    #ifdef SERIAL_DEBUG
-      Serial.print("deep sleep start, shake to wakeup ");
-    #endif
-//    esp_deep_sleep_pd_config(ESP_PD_DOMAIN_RTC_PERIPH, ESP_PD_OPTION_ON);
-    esp_sleep_enable_ext0_wakeup(GPIO_NUM_34,0);
-    rtc_gpio_isolate(GPIO_NUM_12);
-    esp_deep_sleep_start();
+    deepSleep();
   }
 }
