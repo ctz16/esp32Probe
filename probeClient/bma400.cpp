@@ -2,9 +2,6 @@
 
 void BMA400::initialize(void) {
     if (setPoweMode(NORMAL) && setFullScaleRange(RANGE_4G) && setOutputDataRate(ODR_200)){
-        #ifdef SERIAL_DEBUG
-            Serial.println("BMA400 ready");
-        #endif
     }
 }
 

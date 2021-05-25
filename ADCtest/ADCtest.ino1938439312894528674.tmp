@@ -1,6 +1,6 @@
 #include <driver/adc.h>
 #include <esp_deep_sleep.h>
-#define SAMPLES 1000
+#define SAMPLES 500
 uint16_t val[SAMPLES];
 
 void setup() {

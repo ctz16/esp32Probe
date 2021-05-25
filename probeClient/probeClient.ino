@@ -329,8 +329,8 @@ void discharge(){
 //  portDISABLE_INTERRUPTS();
   adc_start_time = millis();
   for (int i = 0; i < SAMPLE_NUM; i++){
-//    adc_reading[i] = analogRead(36);  //sensor vp
-    adc_reading[i] = adc1_get_raw(ADC1_CHANNEL_0);
+    adc_reading[i] = analogRead(36);  //sensor vp
+//    adc_reading[i] = adc1_get_raw(ADC1_CHANNEL_0);
   }
   // we shall do the calculation outside:
   // adc_results[i] = 1.1* ( (float) (adc_reading[i]& 0x0FFF)) /0x0FFF;
@@ -420,12 +420,15 @@ void deepSleep(){
       #ifdef SERIAL_DEBUG
         Serial.println("BMA400 is ready");
       #endif
+      //    esp_deep_sleep_pd_config(ESP_PD_DOMAIN_RTC_PERIPH, ESP_PD_OPTION_ON);
+      esp_sleep_enable_ext0_wakeup(GPIO_NUM_34,0);
+      rtc_gpio_isolate(GPIO_NUM_12);
   }
   #ifdef SERIAL_DEBUG
   else
   {
       Serial.println("BMA400 is not connected");
-      delay(3000);
+      delay(500);
   }
   #endif
   #ifdef SERIAL_DEBUG
@@ -433,9 +436,6 @@ void deepSleep(){
   #endif
   hspi->end();
   delay(500);
-//    esp_deep_sleep_pd_config(ESP_PD_DOMAIN_RTC_PERIPH, ESP_PD_OPTION_ON);
-  esp_sleep_enable_ext0_wakeup(GPIO_NUM_34,0);
-  rtc_gpio_isolate(GPIO_NUM_12);
   esp_deep_sleep_start();
 }
 
@@ -465,7 +465,7 @@ void setup(void) {
   else
   {
       Serial.println("BMA400 is not connected");
-      delay(3000);
+      delay(500);
   }
   #endif
   hspi->end();
