@@ -2,5 +2,6 @@
     "files.associations": {
         "cstdlib": "cpp"
     },
-    "C_Cpp.errorSquiggles": "Disabled"
+    "C_Cpp.errorSquiggles": "Disabled",
+    "idf.gitPath": "C:\\Users\\chang\\.espressif\\tools\\idf-git\\cmd\\git.exe"
 }

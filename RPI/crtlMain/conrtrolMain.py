@@ -4,7 +4,9 @@ import RPi.GPIO as GPIO
 
 Uset = 100.0
 Iset = 10.0
-trigPin = 40
+bottomTrigPin = 40
+topTrigPin = 39
+defaultTimeout = 10
 
 s=hspy(serial_port='/dev/ttyUSB0', addr=0)
 s.setU(Uset)
@@ -28,12 +30,34 @@ time.sleep(10)
 s.stop()
 print("Uout:", s.getUout())
 
-print("Uout:", s.getUout())
+def trig_callback():
+    global topTrigTime
+    topTrigTime = time.time()
+    global topTrigFlag
+    topTrigFlag = True
+    
+topTrigFlag = False
 GPIO.setwarnings(False)
 GPIO.setmode(GPIO.BOARD)
-GPIO.setup(trigPin, GPIO.OUT)
-GPIO.output(trigPin,GPIO.HIGH)
+GPIO.setup(bottomTrigPin, GPIO.OUT)
+
+GPIO.output(bottomTrigPin,GPIO.HIGH)
 time.sleep(0.001)
-GPIO.output(trigPin,GPIO.LOW)
+GPIO.output(bottomTrigPin,GPIO.LOW)
+btTrigTime = time.time()
+topTrigTime = 0
+print("bottom triggered")
+
+GPIO.setup(topTrigPin, GPIO.IN)
+GPIO.add_event_detect(topTrigPin, GPIO.RISING, callback=trig_callback)
+
+while True:
+    if time.time()-btTrigTime > defaultTimeout:
+        print("top trigger not detected")
+        break
+    if topTrigFlag:
+        print("top triggered, time:")
+        print(topTrigTime-btTrigTime)
+        break
+
 GPIO.cleanup()
-print("triggered")

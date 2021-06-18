@@ -1,4 +1,4 @@
-# Project Probe
+# Missile Probe
 
 This is a control system serves to build an independent probe, which based on the framework Raspberry Pi + ESP32. Pi controller is directly accessed, and one of the ESP32 connected to Pi is used as BLE server. Another ESP32 in the probe is the client and data collector. 
 
